@@ -22,7 +22,7 @@ use rppal::gpio::Gpio;
 pub struct BikeSensor {
     pub uart: Arc<Mutex<UartSensor>>,
     pub i2c: Arc<Mutex<I2CSensor>>,
-    pub bluetooth: Arc<Mutex<BluetoothSensor>>,
+    pub thermocouple: Arc<Mutex<ThermocoupleSensor>>,
     pub hall: Arc<Mutex<HallSensor>>,
     pub brake_pressure: Arc<Mutex<BrakePressureSensor>>,
     pub file: Arc<Mutex<std::fs::File>>,
@@ -49,7 +49,7 @@ impl BikeSensor {
         BikeSensor {
             uart: Arc::new(Mutex::new(UartSensor::new())),
             i2c: Arc::new(Mutex::new(I2CSensor::new())),
-            bluetooth: Arc::new(Mutex::new(BluetoothSensor::new())),
+            thermocouple: Arc::new(Mutex::new(ThermocoupleSensor::new())),
             hall: Arc::new(Mutex::new(HallSensor::new())),
             brake_pressure: Arc::new(Mutex::new(BrakePressureSensor::new())),
             file: Arc::new(Mutex::new(
@@ -72,7 +72,7 @@ impl BikeSensor {
     pub fn write_file(&self) -> Result<(), Box<dyn std::error::Error + '_>> {
         let mut uart = self.uart.lock()?;
         let mut i2c = self.i2c.lock()?;
-        let bluetooth = self.bluetooth.lock()?;
+        let thermocouple = self.thermocouple.lock()?;
         let mut hall = self.hall.lock()?;
         let brake_press = self.brake_pressure.lock()?;
 
@@ -108,7 +108,7 @@ impl BikeSensor {
                     i2c.steer,
                     hall_speed,
                     hall_rpm,
-                    bluetooth.termocouple1,
+                    thermocouple.thermocouple_temperature,
                     brake_press.brake_pressure
                 )
                 .as_bytes(),
@@ -123,7 +123,7 @@ impl BikeSensor {
     pub fn get_json(&self) -> Result<serde_json::Value, Box<dyn std::error::Error + '_>> {
         let uart = self.uart.lock()?;
         let i2c = self.i2c.lock()?;
-        let bluetooth = self.bluetooth.lock()?;
+        let thermocouple = self.thermocouple.lock()?;
         let mut hall = self.hall.lock()?;
 
         let mut counter = self.counter.lock()?;
@@ -161,7 +161,7 @@ impl BikeSensor {
             "lat": 0.0,
             "press_ar": format!("{:.2}", hall_speed),
             "altitude": 0.0,
-            "termopar1": bluetooth.termocouple1,
+            "termopar1": thermocouple.thermocouple_temperature,
             "Horario" : time_str
         });
 
@@ -281,28 +281,27 @@ impl I2CSensor {
     }
 }
 
-pub struct BluetoothSensor {
-    //bluetooth_conn: BtSocket,
+pub struct ThermocoupleSensor {
     cs_pin: rppal::gpio::OutputPin,
     clk_pin: rppal::gpio::OutputPin,
     data_pin: rppal::gpio::InputPin,
-    pub termocouple1: f32,
+    pub thermocouple_temperature: f32,
 }
 
-impl BluetoothSensor {
-    pub fn new() -> BluetoothSensor {
+impl ThermocoupleSensor {
+    pub fn new() -> ThermocoupleSensor {
         let mut cs_pin = Gpio::new().unwrap().get(27).unwrap().into_output();
         let clk_pin = Gpio::new().unwrap().get(17).unwrap().into_output();
         let data_pin = Gpio::new().unwrap().get(22).unwrap().into_input();
 
         cs_pin.set_high();
 
-        BluetoothSensor {
+        ThermocoupleSensor {
             cs_pin,
             clk_pin,
             data_pin,
 
-            termocouple1: 0.0,
+            thermocouple_temperature: 0.0,
         }
     }
 
@@ -333,7 +332,7 @@ impl BluetoothSensor {
     }
 
     pub fn update(&mut self) {
-        self.termocouple1 = self.read_max6675();
+        self.thermocouple_temperature = self.read_max6675();
     }
 }
 

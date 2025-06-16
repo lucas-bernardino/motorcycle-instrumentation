@@ -5,7 +5,9 @@ use std::{
 };
 
 use rppal::gpio::{Event, Gpio, Trigger};
-use rustfied::sensor::{BikeSensor, BluetoothSensor, BrakePressureSensor, I2CSensor, UartSensor};
+use rustfied::sensor::{
+    BikeSensor, BrakePressureSensor, I2CSensor, ThermocoupleSensor, UartSensor,
+};
 
 use tokio::sync::Notify;
 
@@ -60,11 +62,11 @@ async fn main() {
             .expect("main: [ERROR] Failed to get sensor lock")
             .i2c,
     );
-    let bluetooth_sensor = Arc::clone(
+    let thermocouple_sensor = Arc::clone(
         &sensor
             .lock()
             .expect("main: [ERROR] Failed to get sensor lock")
-            .bluetooth,
+            .thermocouple,
     );
     let brake_pressure_sensor = Arc::clone(
         &sensor
@@ -141,8 +143,8 @@ async fn main() {
         network_task(network_clone, notify_clone, is_capturing_data_network_clone).await;
     });
 
-    let bluetooth_handler = tokio::spawn(async move {
-        bluetooth_sensor_task(bluetooth_sensor).await;
+    let thermocouple_handler = tokio::spawn(async move {
+        thermocouple_sensor_task(thermocouple_sensor).await;
     });
 
     let brake_pressure_handler = tokio::spawn(async move {
@@ -156,7 +158,7 @@ async fn main() {
     let _ = tokio::join!(
         file_handler,
         network_handler,
-        bluetooth_handler,
+        thermocouple_handler,
         brake_pressure_handler,
         display_handler,
     );
@@ -230,15 +232,17 @@ fn i2c_sensor_task(i2c_sensor: Arc<Mutex<I2CSensor>>, notification: Arc<Notify>)
     }
 }
 
-async fn bluetooth_sensor_task(bluetooth_sensor: Arc<Mutex<BluetoothSensor>>) {
+async fn thermocouple_sensor_task(thermocouple_sensor: Arc<Mutex<ThermocoupleSensor>>) {
     loop {
         {
-            match bluetooth_sensor.lock() {
-                Ok(mut bluetooth_lock) => {
-                    bluetooth_lock.update();
+            match thermocouple_sensor.lock() {
+                Ok(mut thermocouple_lock) => {
+                    thermocouple_lock.update();
                 }
                 Err(e) => {
-                    println!("bluetooth_sensor_task: [ERROR] Failed to get bluetooth lock: {e}")
+                    println!(
+                        "thermocouple_sensor_task: [ERROR] Failed to get thermocouple lock: {e}"
+                    )
                 }
             }
         }
