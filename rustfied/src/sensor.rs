@@ -1,8 +1,7 @@
 use std::fmt::Write as _;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::{
     fmt,
-    str::FromStr,
     sync::{Arc, Mutex},
 };
 
@@ -54,7 +53,7 @@ impl BikeSensor {
             brake_pressure: Arc::new(Mutex::new(BrakePressureSensor::new())),
             file: Arc::new(Mutex::new(
                 std::fs::File::create(file_name)
-                    .expect("Failed to create file with path the given path"),
+                    .expect("Failed to create file with the given path"),
             )),
             counter: Arc::new(Mutex::new(0)),
         }
@@ -262,22 +261,29 @@ impl I2CSensor {
         }
     }
 
-    pub fn update(&mut self) -> Result<(), &'static str> {
-        let high_byte = (self
-            .i2c_device
-            .smbus_read_byte_data(0x0C)
-            .expect("Failed to read register 0x0C") as u16)
-            << 8;
-        let low_byte = self
-            .i2c_device
-            .smbus_read_byte_data(0x0D)
-            .expect("Failed to read register 0x0D") as u16;
+    pub fn update(&mut self) -> Result<(), String> {
+        match self.i2c_device.smbus_read_byte_data(0x0C) {
+            Ok(high_byte_reading) => match self.i2c_device.smbus_read_byte_data(0x0D) {
+                Ok(low_byte_reading) => {
+                    let high_byte = (high_byte_reading as u16) << 8;
+                    let low_byte = low_byte_reading as u16;
 
-        let raw_angle = high_byte | low_byte;
-        let angle_degrees = ((raw_angle & 0xFFF) as f64) * 0.08789;
+                    let raw_angle = high_byte | low_byte;
+                    let angle_degrees = ((raw_angle & 0xFFF) as f64) * 0.08789;
 
-        self.steer = format!("{:.2}", angle_degrees);
-        Ok(())
+                    self.steer = format!("{:.2}", angle_degrees);
+                    Ok(())
+                }
+                Err(e) => {
+                    let err_msg = format!("I2CSensor: [ERROR] Failed to read 0x0D register: {e}");
+                    return Err(err_msg);
+                }
+            },
+            Err(e) => {
+                let err_msg = format!("I2CSensor: [ERROR] Failed to read 0x0C register: {e}");
+                return Err(err_msg);
+            }
+        }
     }
 }
 
@@ -290,9 +296,21 @@ pub struct ThermocoupleSensor {
 
 impl ThermocoupleSensor {
     pub fn new() -> ThermocoupleSensor {
-        let mut cs_pin = Gpio::new().unwrap().get(27).unwrap().into_output();
-        let clk_pin = Gpio::new().unwrap().get(17).unwrap().into_output();
-        let data_pin = Gpio::new().unwrap().get(22).unwrap().into_input();
+        let mut cs_pin = Gpio::new()
+            .expect("ThermocoupleSensor: [ERROR] Failed to create GPIO")
+            .get(27)
+            .expect("ThermocoupleSensor: [ERROR] Failed to use GPIO 27")
+            .into_output();
+        let clk_pin = Gpio::new()
+            .expect("ThermocoupleSensor: [ERROR] Failed to create GPIO")
+            .get(17)
+            .expect("ThermocoupleSensor: [ERROR] Failed to use GPIO 17")
+            .into_output();
+        let data_pin = Gpio::new()
+            .expect("ThermocoupleSensor: [ERROR] Failed to create GPIO")
+            .get(22)
+            .expect("ThermocoupleSensor: [ERROR] Failed to use GPIO 22")
+            .into_input();
 
         cs_pin.set_high();
 
@@ -309,7 +327,7 @@ impl ThermocoupleSensor {
         self.cs_pin.set_low();
 
         let mut bytesin: u16 = 0;
-        for i in 0..16 {
+        for _ in 0..16 {
             self.clk_pin.set_low();
             std::thread::sleep(std::time::Duration::from_micros(100));
 
@@ -362,7 +380,7 @@ impl HallSensor {
 
     pub fn calculate_speed(&mut self) {
         if self.elapse.as_millis() > 0 {
-            let rpm = 60000.0 / self.elapse.as_millis() as f32;
+            let _rpm = 60000.0 / self.elapse.as_millis() as f32;
             let circ_cm = 2.0 * std::f32::consts::PI * self.wheel_radius;
             let dist_km = circ_cm / 100000.0;
             let km_per_sec = dist_km / (self.elapse.as_millis() as f32 / 1000.0);
@@ -378,10 +396,11 @@ pub struct BrakePressureSensor {
 
 impl BrakePressureSensor {
     pub fn new() -> Self {
-        let i2c_dev = I2cdev::new("/dev/i2c-1").unwrap();
+        let i2c_dev = I2cdev::new("/dev/i2c-1")
+            .expect("BrakePressureSensor: [ERROR] Failed to open /dev/i2c-1");
         let mut adc = Ads1x1x::new_ads1115(i2c_dev, TargetAddr::default());
         adc.set_full_scale_range(ads1x1x::FullScaleRange::Within4_096V)
-            .unwrap();
+            .expect("BrakePressureSensor: [ERROR] Failed to set_full_scale_range");
 
         Self {
             adc,
@@ -391,10 +410,14 @@ impl BrakePressureSensor {
 
     pub fn update(&mut self) {
         let reading = self.adc.read(ads1x1x::channel::SingleA0);
-        if reading.is_ok() {
-            let voltage_val =
-                (reading.unwrap() as f32) * 4.096 / ((i32::pow(2, 16 - 1) - 1) as f32);
-            self.brake_pressure = voltage_val;
+        match reading {
+            Ok(read_val) => {
+                let voltage_val = (read_val as f32) * 4.096 / ((i32::pow(2, 16 - 1) - 1) as f32);
+                self.brake_pressure = voltage_val;
+            }
+            Err(_) => {
+                println!("BrakePressureSensor: [ERROR] Failed to read ADC")
+            }
         }
     }
 }
