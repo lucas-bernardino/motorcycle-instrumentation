@@ -28,8 +28,17 @@ const SEND_DATA_ONLINE_INTERVAL: u64 = 250; // 250 ms
 
 #[tokio::main]
 async fn main() {
-    let mut button_pin = Gpio::new().unwrap().get(26).unwrap().into_input_pullup();
-    let mut hall_pin = Gpio::new().unwrap().get(21).unwrap().into_input_pullup();
+    let mut button_pin = Gpio::new()
+        .expect("main: [ERROR] Failed to create GPIO")
+        .get(26)
+        .expect("main: [ERROR] Failed to use GPIO 26")
+        .into_input_pullup();
+
+    let mut hall_pin = Gpio::new()
+        .expect("main: [ERROR] Failed to create GPIO")
+        .get(21)
+        .expect("main: [ERROR] Failed to use GPIO 21")
+        .into_input_pullup();
 
     let sensor = Arc::new(Mutex::new(BikeSensor::new()));
     let notify = Arc::new(Notify::new());
@@ -39,16 +48,41 @@ async fn main() {
     let display_sensor_clone = Arc::clone(&sensor);
     let button_interrupt_sensor_clone = Arc::clone(&sensor);
 
-    let uart_sensor = Arc::clone(&sensor.lock().unwrap().uart);
-    let i2c_sensor = Arc::clone(&sensor.lock().unwrap().i2c);
-    let bluetooth_sensor = Arc::clone(&sensor.lock().unwrap().bluetooth);
-    let brake_pressure_sensor = Arc::clone(&sensor.lock().unwrap().brake_pressure);
+    let uart_sensor = Arc::clone(
+        &sensor
+            .lock()
+            .expect("main: [ERROR] Failed to get sensor lock")
+            .uart,
+    );
+    let i2c_sensor = Arc::clone(
+        &sensor
+            .lock()
+            .expect("main: [ERROR] Failed to get sensor lock")
+            .i2c,
+    );
+    let bluetooth_sensor = Arc::clone(
+        &sensor
+            .lock()
+            .expect("main: [ERROR] Failed to get sensor lock")
+            .bluetooth,
+    );
+    let brake_pressure_sensor = Arc::clone(
+        &sensor
+            .lock()
+            .expect("main: [ERROR] Failed to get sensor lock")
+            .brake_pressure,
+    );
 
     let uart_notify = Arc::clone(&notify);
     let i2c_notify = Arc::clone(&notify);
     let notify_clone = Arc::clone(&notify);
 
-    let sensor_speed_clone_interrupt = Arc::clone(&sensor.lock().unwrap().hall);
+    let sensor_speed_clone_interrupt = Arc::clone(
+        &sensor
+            .lock()
+            .expect("main: [ERROR] Failed to get sensor lock")
+            .hall,
+    );
 
     let is_capturing_data = Arc::new(Mutex::new(true));
     let is_capturing_data_file_clone = Arc::clone(&is_capturing_data);
@@ -56,14 +90,17 @@ async fn main() {
 
     let button_interrupt_callback = move |_: Event| {
         dbg!("Button pressed!");
-        let mut guard = is_capturing_data.lock().unwrap();
-        *guard = !(*guard); // toggle is_capturing_data
+        if let Ok(mut guard) = is_capturing_data.lock() {
+            *guard = !(*guard); // toggle is_capturing_data
 
-        button_interrupt_sensor_clone
-            .lock()
-            .unwrap()
-            .update_file()
-            .unwrap();
+            button_interrupt_sensor_clone
+                .lock()
+                .unwrap()
+                .update_file()
+                .unwrap();
+        } else {
+            println!("button_interrupt_callback: [ERROR] Failed to get is_capturing_data lock")
+        }
     };
 
     button_pin
@@ -72,16 +109,21 @@ async fn main() {
             Some(Duration::from_millis(500)),
             button_interrupt_callback,
         )
-        .expect("Failed to set interrupt");
+        .expect("main: [ERROR] Failed to set button interrupt");
 
     let hall_interrupt_callback = move |_: Event| {
-        let mut data_speed = sensor_speed_clone_interrupt.lock().unwrap();
-        data_speed.update();
+        if let Ok(mut data_speed) = sensor_speed_clone_interrupt.lock() {
+            data_speed.update();
+        } else {
+            println!(
+                "hall_interrupt_callback: [ERROR] Failed to get sensor_speed_clone_interrupt lock"
+            )
+        }
     };
 
     hall_pin
         .set_async_interrupt(Trigger::FallingEdge, None, hall_interrupt_callback)
-        .expect("Failed to set interrupt");
+        .expect("main: [ERROR] Failed to set hall interrupt");
 
     tokio::task::spawn_blocking(move || {
         uart_sensor_task(uart_sensor, uart_notify);
