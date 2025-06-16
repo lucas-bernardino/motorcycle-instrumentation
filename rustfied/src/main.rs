@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use clap::{Arg, Command};
 use rppal::gpio::{Event, Gpio, Trigger};
 use rustfied::sensor::{
     BikeSensor, BrakePressureSensor, I2CSensor, ThermocoupleSensor, UartSensor,
@@ -30,6 +31,27 @@ const SEND_DATA_ONLINE_INTERVAL: u64 = 250; // 250 ms
 
 #[tokio::main]
 async fn main() {
+    let cmd = Command::new("rustified")
+        .arg(
+            Arg::new("mode")
+                .short('m')
+                .long("mode")
+                .value_name("MODE")
+                .help("Internet status. Valid options: `on` or `off`")
+                .required(true),
+        )
+        .get_matches();
+
+    let mode_arg = cmd
+        .get_one::<String>("mode")
+        .expect("main: [ERROR] Failed to get `mode` from command line argument");
+
+    if mode_arg != "on" && mode_arg != "off" {
+        panic!("Invalid `mode` in command line argument. Should be `on` or `off`")
+    }
+
+    let mode_arg = if mode_arg == "on" { true } else { false };
+
     let mut button_pin = Gpio::new()
         .expect("main: [ERROR] Failed to create GPIO")
         .get(26)
@@ -139,10 +161,6 @@ async fn main() {
         file_task(file_sensor_clone, notify, is_capturing_data_file_clone).await;
     });
 
-    let network_handler = tokio::spawn(async move {
-        network_task(network_clone, notify_clone, is_capturing_data_network_clone).await;
-    });
-
     let thermocouple_handler = tokio::spawn(async move {
         thermocouple_sensor_task(thermocouple_sensor).await;
     });
@@ -155,13 +173,28 @@ async fn main() {
         display_task(display_sensor_clone).await;
     });
 
-    let _ = tokio::join!(
-        file_handler,
-        network_handler,
-        thermocouple_handler,
-        brake_pressure_handler,
-        display_handler,
-    );
+    // if mode_arg is true, then there's internet connection available and so create a task for the
+    // network_handler. Othersise, run without this task.
+    if mode_arg {
+        let network_handler = tokio::spawn(async move {
+            network_task(network_clone, notify_clone, is_capturing_data_network_clone).await;
+        });
+
+        let _ = tokio::join!(
+            file_handler,
+            network_handler,
+            thermocouple_handler,
+            brake_pressure_handler,
+            display_handler,
+        );
+    } else {
+        let _ = tokio::join!(
+            file_handler,
+            thermocouple_handler,
+            brake_pressure_handler,
+            display_handler,
+        );
+    }
 }
 
 fn uart_sensor_task(uart_sensor: Arc<Mutex<UartSensor>>, notification: Arc<Notify>) {
