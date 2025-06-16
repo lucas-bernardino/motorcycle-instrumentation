@@ -408,15 +408,16 @@ impl BrakePressureSensor {
         }
     }
 
-    pub fn update(&mut self) {
+   pub fn update(&mut self) {
         let reading = self.adc.read(ads1x1x::channel::SingleA0);
         match reading {
             Ok(read_val) => {
                 let voltage_val = (read_val as f32) * 4.096 / ((i32::pow(2, 16 - 1) - 1) as f32);
                 self.brake_pressure = voltage_val;
             }
-            Err(_) => {
-                println!("BrakePressureSensor: [ERROR] Failed to read ADC")
+            Err(linux_embedded_hal::nb::Error::WouldBlock) => {}
+            Err(e) => {
+                println!("BrakePressureSensor: [ERROR] Failed to read ADC. {:#?}", e)
             }
         }
     }
