@@ -10,7 +10,7 @@ for file_name in files_txt:
     with open(f"{file_name}", 'r') as file:
         if not file.readline():
             continue
-
+        
         dados_com_n = file.readlines()
         dados_ = [dado.rstrip() for dado in dados_com_n]
 
@@ -69,6 +69,7 @@ for file_name in files_txt:
                     contador += 1
             except Exception as e:
                 print(f"Erro: {e}.\n\nPosicao: {contador} ")
+
 
         df = pd.DataFrame(data=list_of_dicts)
 

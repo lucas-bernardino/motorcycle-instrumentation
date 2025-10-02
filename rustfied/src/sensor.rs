@@ -99,19 +99,21 @@ impl BikeSensor {
             if hall_rpm.is_infinite() {
                 hall_rpm = 0.0;
             }
-            self.file.lock()?.write_all(
-                format!(
-                    "{}{}{}#{:.2}${:.2}!{:.2}@~{}\n",
-                    uart_str,
-                    time_str,
-                    i2c.steer,
-                    hall_speed,
-                    hall_rpm,
-                    thermocouple.thermocouple_temperature,
-                    brake_press.brake_pressure
-                )
-                .as_bytes(),
-            )?;
+
+            let data_to_file = format!(
+                "{}{}{}#{:.2}${:.2}!{:.2}@~{}\n",
+                uart_str,
+                time_str,
+                i2c.steer,
+                hall_rpm,
+                hall_speed,
+                thermocouple.thermocouple_temperature,
+                brake_press.brake_pressure
+            );
+
+            println!("{}", data_to_file);
+
+            self.file.lock()?.write_all(data_to_file.as_bytes())?;
 
             uart.is_ready = false;
             i2c.is_ready = false;
@@ -408,7 +410,7 @@ impl BrakePressureSensor {
         }
     }
 
-   pub fn update(&mut self) {
+    pub fn update(&mut self) {
         let reading = self.adc.read(ads1x1x::channel::SingleA0);
         match reading {
             Ok(read_val) => {
@@ -417,7 +419,8 @@ impl BrakePressureSensor {
             }
             Err(linux_embedded_hal::nb::Error::WouldBlock) => {}
             Err(e) => {
-                println!("BrakePressureSensor: [ERROR] Failed to read ADC. {:#?}", e)
+                println!("BrakePressureSensor: [ERROR] Failed to read ADC. {:#?}", e);
+                self.brake_pressure = 0.0 as f32;
             }
         }
     }
