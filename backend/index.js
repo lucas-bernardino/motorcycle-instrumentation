@@ -204,7 +204,7 @@ mongoose.set("strictQuery", false);
 
 mongoose
   .connect(
-    `mongodb+srv://${process.env.MONGOOSE_USERNAME}:${process.env.MONGOOSE_PASSWORD}@motobmw.9krdce4.mongodb.net/Node-API?retryWrites=true&w=majority`,
+    `mongodb+srv://${process.env.MONGOOSE_USERNAME}:${process.env.MONGOOSE_PASSWORD}@cluster-tcc.woqkzqa.mongodb.net/?appName=cluster-tcc`,
   )
   .then(() => {
     console.log("Conectado ao MongoDB.");
