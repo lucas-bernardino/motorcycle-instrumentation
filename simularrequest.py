@@ -24,11 +24,10 @@ dados_package = {
   "veloc": 0,
   "long": 0,
   "lat": 0,
-  "press_ar": "0.9970984455958549",
+  "veloc_hall": 3,
   "altitude": "420",
-  "termopar1" : 420,
-  "termopar2" : 69,
-  "termopar3": 123
+  "termopar1" : 25,
+  "brake_pressure" : 69,
 }
 
 contador = {
@@ -68,6 +67,12 @@ def send_data_package():
     
     dados_package["lat"]+=i
     dados_package["long"]+=i
+
+    dados_package["termopar1"]+=i
+
+    dados_package["veloc_hall"]+=i
+
+    dados_package["brake_pressure"]+=i
     i+=1
 
 while True:
