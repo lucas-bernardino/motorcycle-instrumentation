@@ -154,28 +154,28 @@ async fn main() {
         .set_async_interrupt(Trigger::FallingEdge, None, hall_interrupt_callback)
         .expect("main: [ERROR] Failed to set hall interrupt");
 
-    tokio::task::spawn_blocking(move || {
+    let uart_handler = tokio::task::spawn_blocking(move || {
         uart_sensor_task(uart_sensor, uart_notify);
     });
 
-    tokio::task::spawn_blocking(move || {
+    let i2c_handler = tokio::task::spawn_blocking(move || {
         i2c_sensor_task(i2c_sensor, i2c_notify);
+    });
+
+    let thermocouple_handler = tokio::task::spawn_blocking(move || {
+        thermocouple_sensor_task(thermocouple_sensor);
+    });
+
+    let brake_pressure_handler = tokio::task::spawn_blocking(move || {
+        brake_pressure_sensor_task(brake_pressure_sensor);
+    });
+
+    let display_handler = tokio::task::spawn_blocking(move || {
+        display_task(display_sensor_clone);
     });
 
     let file_handler = tokio::spawn(async move {
         file_task(file_sensor_clone, notify, is_capturing_data_file_clone).await;
-    });
-
-    let thermocouple_handler = tokio::spawn(async move {
-        thermocouple_sensor_task(thermocouple_sensor).await;
-    });
-
-    let brake_pressure_handler = tokio::spawn(async move {
-        brake_pressure_sensor_task(brake_pressure_sensor).await;
-    });
-
-    let display_handler = tokio::spawn(async move {
-        display_task(display_sensor_clone).await;
     });
 
     // if mode_arg is true, then there's internet connection available and so create a task for the
@@ -186,6 +186,8 @@ async fn main() {
         });
 
         let _ = tokio::join!(
+            uart_handler,
+            i2c_handler,
             file_handler,
             network_handler,
             thermocouple_handler,
@@ -194,6 +196,8 @@ async fn main() {
         );
     } else {
         let _ = tokio::join!(
+            uart_handler,
+            i2c_handler,
             file_handler,
             thermocouple_handler,
             brake_pressure_handler,
@@ -270,7 +274,7 @@ fn i2c_sensor_task(i2c_sensor: Arc<Mutex<I2CSensor>>, notification: Arc<Notify>)
     }
 }
 
-async fn thermocouple_sensor_task(thermocouple_sensor: Arc<Mutex<ThermocoupleSensor>>) {
+fn thermocouple_sensor_task(thermocouple_sensor: Arc<Mutex<ThermocoupleSensor>>) {
     loop {
         {
             match thermocouple_sensor.lock() {
@@ -284,11 +288,11 @@ async fn thermocouple_sensor_task(thermocouple_sensor: Arc<Mutex<ThermocoupleSen
                 }
             }
         }
-        tokio::time::sleep(Duration::from_millis(250)).await;
+        std::thread::sleep(Duration::from_millis(250));;
     }
 }
 
-async fn brake_pressure_sensor_task(brake_pressure_sensor: Arc<Mutex<BrakePressureSensor>>) {
+fn brake_pressure_sensor_task(brake_pressure_sensor: Arc<Mutex<BrakePressureSensor>>) {
     loop {
         {
             match brake_pressure_sensor.lock() {
@@ -302,11 +306,11 @@ async fn brake_pressure_sensor_task(brake_pressure_sensor: Arc<Mutex<BrakePressu
                 }
             }
         }
-        tokio::time::sleep(Duration::from_millis(1)).await;
+        std::thread::sleep(Duration::from_millis(1));
     }
 }
 
-async fn display_task(bike_sensor: Arc<Mutex<BikeSensor>>) {
+fn display_task(bike_sensor: Arc<Mutex<BikeSensor>>) {
     let mut disp = init_ssd1306_display();
 
     let text_style = MonoTextStyleBuilder::new()
@@ -365,7 +369,7 @@ async fn display_task(bike_sensor: Arc<Mutex<BikeSensor>>) {
                 }
             }
         }
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        std::thread::sleep(Duration::from_millis(500));
         let _ = disp.flush();
     }
 }
