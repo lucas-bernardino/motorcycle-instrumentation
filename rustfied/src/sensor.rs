@@ -100,8 +100,6 @@ impl BikeSensor {
                 hall_rpm = 0.0;
             }
 
-            hall_speed = hall_speed / 6.0; // 6 imas
-
             let data_to_file = format!(
                 "{}{}{}#{:.2}${:.2}!{:.2}@~{}\n",
                 uart_str,
@@ -391,7 +389,7 @@ impl HallSensor {
             let circ_cm = 2.0 * std::f32::consts::PI * self.wheel_radius;
             let dist_km = circ_cm / 100000.0;
             let km_per_sec = dist_km / (self.elapse.as_millis() as f32 / 1000.0);
-            self.km_per_hour = km_per_sec * 3600.0;
+            self.km_per_hour = ( km_per_sec * 3600.0 ) / 6; // 6 imas
         }
     }
 }
