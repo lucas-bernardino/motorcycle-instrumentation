@@ -116,7 +116,6 @@ async fn main() {
     let is_capturing_data_network_clone = Arc::clone(&is_capturing_data);
 
     let button_interrupt_callback = move |_: Event| {
-        println!("------------------------------------------------------------------------------------------ INTERRUPT BUTTON CALLED");
         dbg!("Button pressed!");
         if let Ok(mut guard) = is_capturing_data.lock() {
             *guard = !(*guard); // toggle is_capturing_data
@@ -140,7 +139,6 @@ async fn main() {
         .expect("main: [ERROR] Failed to set button interrupt");
 
     let hall_interrupt_callback = move |_: Event| {
-        println!("------------------------------------------------------------------------------------------ INTERRUPT HALL CALLED");
         if let Ok(mut data_speed) = sensor_speed_clone_interrupt.lock() {
             data_speed.update();
         } else {

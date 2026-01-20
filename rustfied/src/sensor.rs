@@ -166,7 +166,7 @@ impl BikeSensor {
             "veloc_hall": format!("{:.2}", hall_speed),
             "altitude": 0.0,
             "termopar1": thermocouple.thermocouple_temperature,
-            "brake_pressure" : brake_pressure_sensor.brake_pressure,
+            "brake_pressure" :((brake_pressure_sensor.brake_pressure - 0.376) / 0.05).abs(),
         });
 
         *counter += 1;
@@ -389,7 +389,7 @@ impl HallSensor {
             let circ_cm = 2.0 * std::f32::consts::PI * self.wheel_radius;
             let dist_km = circ_cm / 100000.0;
             let km_per_sec = dist_km / (self.elapse.as_millis() as f32 / 1000.0);
-            self.km_per_hour = ( km_per_sec * 3600.0 ) / 6.0; // 6 imas
+            self.km_per_hour = (km_per_sec * 3600.0) / 6.0; // 6 imas
         }
     }
 }
