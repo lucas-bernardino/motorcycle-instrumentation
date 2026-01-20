@@ -130,6 +130,8 @@ impl BikeSensor {
         let thermocouple = self.thermocouple.lock()?;
         let mut hall = self.hall.lock()?;
 
+        let brake_pressure_sensor = self.brake_pressure.lock()?;
+
         let mut counter = self.counter.lock()?;
 
         //'18:25:52.843023'
@@ -163,10 +165,10 @@ impl BikeSensor {
             "veloc": 0.0,
             "long": 0.0,
             "lat": 0.0,
-            "press_ar": format!("{:.2}", hall_speed),
+            "veloc_hall": format!("{:.2}", hall_speed),
             "altitude": 0.0,
             "termopar1": thermocouple.thermocouple_temperature,
-            "Horario" : time_str
+            "brake_pressure" : brake_pressure_sensor.brake_pressure,
         });
 
         *counter += 1;
