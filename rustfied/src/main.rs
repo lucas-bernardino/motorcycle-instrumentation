@@ -136,6 +136,7 @@ async fn main() {
         .expect("main: [ERROR] Failed to set button interrupt");
 
     let hall_interrupt_callback = move |_: Event| {
+        println!("------------------------------------------------------------------------------------------ INTERRUPT HALL CALLED");
         if let Ok(mut data_speed) = sensor_speed_clone_interrupt.lock() {
             data_speed.update();
         } else {

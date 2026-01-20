@@ -94,11 +94,13 @@ impl BikeSensor {
 
             hall.calculate_speed();
 
-            let hall_speed = hall.km_per_hour;
+            let mut hall_speed = hall.km_per_hour;
             let mut hall_rpm = 60000.0 / hall.elapse.as_millis() as f32;
             if hall_rpm.is_infinite() {
                 hall_rpm = 0.0;
             }
+
+            hall_speed = hall_speed / 6.0; // 6 imas
 
             let data_to_file = format!(
                 "{}{}{}#{:.2}${:.2}!{:.2}@~{}\n",
