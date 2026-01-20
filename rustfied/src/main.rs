@@ -116,6 +116,7 @@ async fn main() {
     let is_capturing_data_network_clone = Arc::clone(&is_capturing_data);
 
     let button_interrupt_callback = move |_: Event| {
+        println!("------------------------------------------------------------------------------------------ INTERRUPT BUTTON CALLED");
         dbg!("Button pressed!");
         if let Ok(mut guard) = is_capturing_data.lock() {
             *guard = !(*guard); // toggle is_capturing_data
@@ -133,7 +134,7 @@ async fn main() {
     button_pin
         .set_async_interrupt(
             Trigger::FallingEdge,
-            Some(Duration::from_millis(500)),
+            Some(Duration::from_millis(50)),
             button_interrupt_callback,
         )
         .expect("main: [ERROR] Failed to set button interrupt");
@@ -198,7 +199,7 @@ async fn main() {
             brake_pressure_handler,
             display_handler,
         );
-    }
+    } 
 }
 
 fn uart_sensor_task(uart_sensor: Arc<Mutex<UartSensor>>, notification: Arc<Notify>) {

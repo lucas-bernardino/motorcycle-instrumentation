@@ -113,6 +113,7 @@ impl BikeSensor {
                 brake_press.brake_pressure
             );
 
+            // Print raw data to terminal
             println!("{}", data_to_file);
 
             self.file.lock()?.write_all(data_to_file.as_bytes())?;
