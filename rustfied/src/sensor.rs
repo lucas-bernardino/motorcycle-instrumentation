@@ -100,8 +100,6 @@ impl BikeSensor {
                 hall_rpm = 0.0;
             }
 
-            hall_speed = hall_speed / 6.0; // 6 imas
-
             let data_to_file = format!(
                 "{}{}{}#{:.2}${:.2}!{:.2}@~{}\n",
                 uart_str,
@@ -113,6 +111,7 @@ impl BikeSensor {
                 brake_press.brake_pressure
             );
 
+            // Print raw data to terminal
             println!("{}", data_to_file);
 
             self.file.lock()?.write_all(data_to_file.as_bytes())?;
@@ -128,6 +127,8 @@ impl BikeSensor {
         let i2c = self.i2c.lock()?;
         let thermocouple = self.thermocouple.lock()?;
         let mut hall = self.hall.lock()?;
+
+        let brake_pressure_sensor = self.brake_pressure.lock()?;
 
         let mut counter = self.counter.lock()?;
 
@@ -162,10 +163,10 @@ impl BikeSensor {
             "veloc": 0.0,
             "long": 0.0,
             "lat": 0.0,
-            "press_ar": format!("{:.2}", hall_speed),
+            "veloc_hall": format!("{:.2}", hall_speed),
             "altitude": 0.0,
             "termopar1": thermocouple.thermocouple_temperature,
-            "Horario" : time_str
+            "brake_pressure" :((brake_pressure_sensor.brake_pressure - 0.376) / 0.05).abs(),
         });
 
         *counter += 1;
@@ -388,7 +389,7 @@ impl HallSensor {
             let circ_cm = 2.0 * std::f32::consts::PI * self.wheel_radius;
             let dist_km = circ_cm / 100000.0;
             let km_per_sec = dist_km / (self.elapse.as_millis() as f32 / 1000.0);
-            self.km_per_hour = km_per_sec * 3600.0;
+            self.km_per_hour = (km_per_sec * 3600.0) / 6.0; // 6 imas
         }
     }
 }
