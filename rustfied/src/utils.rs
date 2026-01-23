@@ -71,7 +71,7 @@ fn get_raw_xyz_values(raw: &[u8]) -> Result<[i16; 3], &'static str> {
 
 pub fn init_ssd1306_display(
 ) -> Ssd1306<I2CInterface<I2cdev>, DisplaySize128x64, BufferedGraphicsMode<DisplaySize128x64>> {
-    let i2c = I2cdev::new("/dev/i2c-1").unwrap();
+    let as5600 = I2cdev::new("/dev/i2c-1").unwrap();
 
     let interface = I2CDisplayInterface::new(i2c);
     let mut disp = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)

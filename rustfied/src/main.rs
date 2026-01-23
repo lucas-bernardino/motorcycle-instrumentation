@@ -10,7 +10,7 @@ use std::{
 use clap::{Arg, Command};
 use rppal::gpio::{Event, Gpio, Trigger};
 use rustfied::sensor::{
-    BikeSensor, BrakePressureSensor, I2CSensor, ThermocoupleSensor, UartSensor,
+    BikeStateCtx, ADS1115, AS5600, MAX6675, WTGAHRS1,
 };
 
 use tokio::sync::Notify;
@@ -67,49 +67,49 @@ async fn main() {
         .expect("main: [ERROR] Failed to use GPIO 21")
         .into_input_pullup();
 
-    let sensor = Arc::new(Mutex::new(BikeSensor::new()));
+    let bike_state_ctx = Arc::new(Mutex::new(BikeStateCtx::new()));
     let notify = Arc::new(Notify::new());
 
-    let file_sensor_clone = Arc::clone(&sensor);
-    let network_clone = Arc::clone(&sensor);
-    let display_sensor_clone = Arc::clone(&sensor);
-    let button_interrupt_sensor_clone = Arc::clone(&sensor);
+    let file_ctx_clone = Arc::clone(&bike_state_ctx);
+    let network_ctx_clone = Arc::clone(&bike_state_ctx);
+    let display_ctx_clone = Arc::clone(&bike_state_ctx);
+    let button_interrupt_ctx_clone = Arc::clone(&bike_state_ctx);
 
-    let uart_sensor = Arc::clone(
-        &sensor
+    let wtgahrs1_ctx = Arc::clone(
+        &bike_state_ctx
             .lock()
-            .expect("main: [ERROR] Failed to get sensor lock")
-            .uart,
+            .expect("main: [ERROR] Failed to get bike_state_ctx lock")
+            .wtgahrs1,
     );
-    let i2c_sensor = Arc::clone(
-        &sensor
+    let as5600_ctx = Arc::clone(
+        &bike_state_ctx
             .lock()
-            .expect("main: [ERROR] Failed to get sensor lock")
-            .i2c,
+            .expect("main: [ERROR] Failed to get bike_state_ctx lock")
+            .as5600,
     );
-    let thermocouple_sensor = Arc::clone(
-        &sensor
+    let max6675_ctx = Arc::clone(
+        &bike_state_ctx
             .lock()
-            .expect("main: [ERROR] Failed to get sensor lock")
-            .thermocouple,
+            .expect("main: [ERROR] Failed to get bike_state_ctx lock")
+            .max6675,
     );
-    let brake_pressure_sensor = Arc::clone(
-        &sensor
+    let ads1115_ctx = Arc::clone(
+        &bike_state_ctx
             .lock()
-            .expect("main: [ERROR] Failed to get sensor lock")
-            .brake_pressure,
+            .expect("main: [ERROR] Failed to get bike_state_ctx lock")
+            .ads1115,
     );
 
-    let uart_notify = Arc::clone(&notify);
-    let i2c_notify = Arc::clone(&notify);
-    let notify_clone = Arc::clone(&notify);
-
-    let sensor_speed_clone_interrupt = Arc::clone(
-        &sensor
+    let a3144_ctx = Arc::clone(
+        &bike_state_ctx
             .lock()
-            .expect("main: [ERROR] Failed to get sensor lock")
-            .hall,
+            .expect("main: [ERROR] Failed to get bike_state_ctx lock")
+            .a3144,
     );
+
+    let wtgahrs1_notify = Arc::clone(&notify);
+    let as5600_notify = Arc::clone(&notify);
+    let network_notify = Arc::clone(&notify);
 
     let is_capturing_data = Arc::new(Mutex::new(true));
     let is_capturing_data_file_clone = Arc::clone(&is_capturing_data);
@@ -120,7 +120,7 @@ async fn main() {
         if let Ok(mut guard) = is_capturing_data.lock() {
             *guard = !(*guard); // toggle is_capturing_data
 
-            button_interrupt_sensor_clone
+            button_interrupt_ctx_clone
                 .lock()
                 .unwrap()
                 .update_file()
@@ -139,72 +139,72 @@ async fn main() {
         .expect("main: [ERROR] Failed to set button interrupt");
 
     let hall_interrupt_callback = move |_: Event| {
-        if let Ok(mut data_speed) = sensor_speed_clone_interrupt.lock() {
+        if let Ok(mut data_speed) = a3144_ctx.lock() {
             data_speed.update();
         } else {
             println!(
-                "hall_interrupt_callback: [ERROR] Failed to get sensor_speed_clone_interrupt lock"
+                "hall_interrupt_callback: [ERROR] Failed to get a3144_ctx lock"
             )
         }
     };
 
     hall_pin
         .set_async_interrupt(Trigger::FallingEdge, None, hall_interrupt_callback)
-        .expect("main: [ERROR] Failed to set hall interrupt");
+        .expect("main: [ERROR] Failed to set a3144 interrupt");
 
-    let uart_handler = tokio::task::spawn_blocking(move || {
-        uart_sensor_task(uart_sensor, uart_notify);
+    let wtgahrs1_task_handler = tokio::task::spawn_blocking(move || {
+        wtgahrs1_task(wtgahrs1_ctx, wtgahrs1_notify);
     });
 
-    let i2c_handler = tokio::task::spawn_blocking(move || {
-        i2c_sensor_task(i2c_sensor, i2c_notify);
+    let as5600_task_handler = tokio::task::spawn_blocking(move || {
+        as5600_task(as5600_ctx, as5600_notify);
     });
 
-    let thermocouple_handler = tokio::task::spawn_blocking(move || {
-        thermocouple_sensor_task(thermocouple_sensor);
+    let max6675_task_handler = tokio::task::spawn_blocking(move || {
+        max6675_task(max6675_ctx);
     });
 
-    let brake_pressure_handler = tokio::task::spawn_blocking(move || {
-        brake_pressure_sensor_task(brake_pressure_sensor);
+    let ads1115_task_handler = tokio::task::spawn_blocking(move || {
+        ads1115_task(ads1115_ctx);
     });
 
-    let display_handler = tokio::task::spawn_blocking(move || {
-        display_task(display_sensor_clone);
+    let display_task_handler = tokio::task::spawn_blocking(move || {
+        display_task(display_ctx_clone);
     });
 
-    let file_handler = tokio::spawn(async move {
-        file_task(file_sensor_clone, notify, is_capturing_data_file_clone).await;
+    let file_task_handler = tokio::spawn(async move {
+        file_task(file_ctx_clone, notify, is_capturing_data_file_clone).await;
     });
 
     // if mode_arg is true, then there's internet connection available and so create a task for the
-    // network_handler. Othersise, run without this task.
+    // network_task_handler. Othersise, run without this task.
     if mode_arg {
-        let network_handler = tokio::spawn(async move {
-            network_task(network_clone, notify_clone, is_capturing_data_network_clone).await;
+        let network_task_handler = tokio::spawn(async move {
+            network_task(network_ctx_clone, network_notify, is_capturing_data_network_clone).await;
         });
 
         let _ = tokio::join!(
-            uart_handler,
-            i2c_handler,
-            file_handler,
-            network_handler,
-            thermocouple_handler,
-            brake_pressure_handler,
-            display_handler,
+            wtgahrs1_task_handler,
+            as5600_task_handler,
+            file_task_handler,
+            network_task_handler,
+            max6675_task_handler,
+            ads1115_task_handler,
+            display_task_handler,
         );
     } else {
         let _ = tokio::join!(
-            uart_handler,
-            i2c_handler,
-            file_handler,
-            thermocouple_handler,
-            brake_pressure_handler,
-            display_handler,
+            wtgahrs1_task_handler,
+            as5600_task_handler,
+            file_task_handler,
+            max6675_task_handler,
+            ads1115_task_handler,
+            display_task_handler,
         );
     } 
 }
 
-fn uart_sensor_task(uart_sensor: Arc<Mutex<UartSensor>>, notification: Arc<Notify>) {
+fn wtgahrs1_task(wtgahrs1_ctx: Arc<Mutex<WTGAHRS1>>, notification: Arc<Notify>) {
     let port = serialport::new(PORT_NAME, BAUD_RATE)
         .timeout(Duration::from_secs(10))
         .open();
@@ -222,21 +222,21 @@ fn uart_sensor_task(uart_sensor: Arc<Mutex<UartSensor>>, notification: Arc<Notif
                     if buff_check.starts_with(&[0x55, 0x51]) {
                         if let Ok(_) = port.read_exact(&mut data_buf[2..]) {
                             // println!("Buff: {:02x?}", data_buf);
-                            if let Ok(mut uart_lock) = uart_sensor.lock() {
+                            if let Ok(mut uart_lock) = wtgahrs1_ctx.lock() {
                                 uart_lock.buffer.copy_from_slice(data_buf.as_slice());
                                 if let Err(e) = uart_lock.update() {
                                     println!(
-                                        "uart_sensor_task: [ERROR] Failed to update uart struct: {}",
+                                        "wtgahrs1_task: [ERROR] Failed to update wtgahrs1 struct: {}",
                                         e
                                     )
                                 }
                                 uart_lock.is_ready = true;
                                 notification.notify_waiters();
                             } else {
-                                println!("uart_sensor_task: [ERROR] Failed to get uart_lock")
+                                println!("wtgahrs1_task: [ERROR] Failed to get uart_lock")
                             }
                         } else {
-                            println!("uart_sensor_task: [ERROR] Failed to read uart sensor data")
+                            println!("wtgahrs1_task: [ERROR] Failed to read wtgahrs1 sensor data")
                         }
                     }
                 }
@@ -249,14 +249,14 @@ fn uart_sensor_task(uart_sensor: Arc<Mutex<UartSensor>>, notification: Arc<Notif
     }
 }
 
-fn i2c_sensor_task(i2c_sensor: Arc<Mutex<I2CSensor>>, notification: Arc<Notify>) {
+fn as5600_task(as5600_ctx: Arc<Mutex<AS5600>>, notification: Arc<Notify>) {
     loop {
         {
-            match i2c_sensor.lock() {
+            match as5600_ctx.lock() {
                 Ok(mut i2c_lock) => {
                     if let Err(e) = i2c_lock.update() {
                         println!(
-                            "i2c_sensor_task: [ERROR] Failed to update i2c struct: {}",
+                            "as5600_task: [ERROR] Failed to update as5600 struct: {}",
                             e
                         )
                     }
@@ -264,7 +264,7 @@ fn i2c_sensor_task(i2c_sensor: Arc<Mutex<I2CSensor>>, notification: Arc<Notify>)
                     notification.notify_waiters();
                 }
                 Err(e) => {
-                    println!("i2c_sensor_task: [ERROR] Failed to get i2c lock: {e}")
+                    println!("as5600_task: [ERROR] Failed to get as5600 lock: {e}")
                 }
             }
         }
@@ -272,16 +272,16 @@ fn i2c_sensor_task(i2c_sensor: Arc<Mutex<I2CSensor>>, notification: Arc<Notify>)
     }
 }
 
-fn thermocouple_sensor_task(thermocouple_sensor: Arc<Mutex<ThermocoupleSensor>>) {
+fn max6675_task(max6675_ctx: Arc<Mutex<MAX6675>>) {
     loop {
         {
-            match thermocouple_sensor.lock() {
+            match max6675_ctx.lock() {
                 Ok(mut thermocouple_lock) => {
                     thermocouple_lock.update();
                 }
                 Err(e) => {
                     println!(
-                        "thermocouple_sensor_task: [ERROR] Failed to get thermocouple lock: {e}"
+                        "max6675_task: [ERROR] Failed to get max6675 lock: {e}"
                     )
                 }
             }
@@ -290,16 +290,16 @@ fn thermocouple_sensor_task(thermocouple_sensor: Arc<Mutex<ThermocoupleSensor>>)
     }
 }
 
-fn brake_pressure_sensor_task(brake_pressure_sensor: Arc<Mutex<BrakePressureSensor>>) {
+fn ads1115_task(ads1115_ctx: Arc<Mutex<ADS1115>>) {
     loop {
         {
-            match brake_pressure_sensor.lock() {
+            match ads1115_ctx.lock() {
                 Ok(mut brake_pressure_lock) => {
                     brake_pressure_lock.update();
                 }
                 Err(e) => {
                     println!(
-                        "brake_pressure_sensor_task: [ERROR] Failed to get brake_pressure_lock lock: {e}"
+                        "ads1115_task: [ERROR] Failed to get brake_pressure_lock lock: {e}"
                     )
                 }
             }
@@ -308,7 +308,7 @@ fn brake_pressure_sensor_task(brake_pressure_sensor: Arc<Mutex<BrakePressureSens
     }
 }
 
-fn display_task(bike_sensor: Arc<Mutex<BikeSensor>>) {
+fn display_task(bike_state_ctx: Arc<Mutex<BikeStateCtx>>) {
     let mut disp = init_ssd1306_display();
 
     let text_style = MonoTextStyleBuilder::new()
@@ -322,8 +322,8 @@ fn display_task(bike_sensor: Arc<Mutex<BikeSensor>>) {
     loop {
         {
             let _ = disp.clear(BinaryColor::Off);
-            match bike_sensor.lock() {
-                Ok(bike_sensor_lock) => match bike_sensor_lock.get_display_data() {
+            match bike_state_ctx.lock() {
+                Ok(bike_state_ctx_lock) => match bike_state_ctx_lock.get_display_data() {
                     Ok(display_data) => {
                         let text1 = format!("GPS");
                         let text2 = format!("{:.2}", display_data[0]);
@@ -363,7 +363,7 @@ fn display_task(bike_sensor: Arc<Mutex<BikeSensor>>) {
                     }
                 },
                 Err(e) => {
-                    println!("display_task: [ERROR] Failed to get bike_sensor lock: {e}")
+                    println!("display_task: [ERROR] Failed to get bike_state_ctx lock: {e}")
                 }
             }
         }
@@ -373,7 +373,7 @@ fn display_task(bike_sensor: Arc<Mutex<BikeSensor>>) {
 }
 
 async fn file_task(
-    bike_sensor: Arc<Mutex<BikeSensor>>,
+    bike_state_ctx: Arc<Mutex<BikeStateCtx>>,
     notification: Arc<Notify>,
     is_capturing_data: Arc<Mutex<bool>>,
 ) {
@@ -391,14 +391,14 @@ async fn file_task(
 
         if should_capture {
             notification.notified().await;
-            match bike_sensor.lock() {
-                Ok(bike_sensor_lock) => {
-                    if let Err(e) = bike_sensor_lock.write_file() {
+            match bike_state_ctx.lock() {
+                Ok(bike_state_ctx_lock) => {
+                    if let Err(e) = bike_state_ctx_lock.write_file() {
                         eprintln!("Error saving to file: {}", e);
                     }
                 }
                 Err(e) => {
-                    println!("file_task: [ERROR] Failed to lock bike_sensor: {}", e);
+                    println!("file_task: [ERROR] Failed to lock bike_state_ctx: {}", e);
                 }
             }
         }
@@ -406,7 +406,7 @@ async fn file_task(
 }
 
 async fn network_task(
-    bike_sensor: Arc<Mutex<BikeSensor>>,
+    bike_state_ctx: Arc<Mutex<BikeStateCtx>>,
     notification: Arc<Notify>,
     is_capturing_data: Arc<Mutex<bool>>,
 ) {
@@ -449,7 +449,7 @@ async fn network_task(
         if should_capture {
             notification.notified().await;
             interval.tick().await;
-            let sensor_json = bike_sensor
+            let sensor_json = bike_state_ctx
                 .lock()
                 .unwrap()
                 .get_json()
