@@ -18,11 +18,12 @@ use crate::utils::{clean_accel, clean_angle, clean_gps_vel, clean_vel};
 
 use rppal::gpio::Gpio;
 
+// TODO: BikeSensor -> BikeStateCtx
 pub struct BikeSensor {
-    pub uart: Arc<Mutex<UartSensor>>,
-    pub i2c: Arc<Mutex<I2CSensor>>,
-    pub thermocouple: Arc<Mutex<ThermocoupleSensor>>,
-    pub hall: Arc<Mutex<HallSensor>>,
+    pub uart: Arc<Mutex<UartSensor>>, // TODO: uart -> wtgahrs1
+    pub i2c: Arc<Mutex<I2CSensor>>, // TODO: i2c -> as5600
+    pub thermocouple: Arc<Mutex<ThermocoupleSensor>>, // TODO: thermocouple -> max6675
+    pub hall: Arc<Mutex<HallSensor>>, // TODO: hall -> a3144
     pub brake_pressure: Arc<Mutex<BrakePressureSensor>>,
     pub file: Arc<Mutex<std::fs::File>>,
 
@@ -182,6 +183,7 @@ impl BikeSensor {
     }
 }
 
+// TODO: UartSensor -> WTGAHRS1
 pub struct UartSensor {
     pub buffer: Vec<u8>,
 
@@ -243,9 +245,10 @@ impl UartSensor {
     }
 }
 
+// TODO: I2CSensor -> AS5600
 pub struct I2CSensor {
-    i2c_device: LinuxI2CDevice,
-    pub steer: String,
+    i2c_device: LinuxI2CDevice, // TODO: i2c_device -> as5600_dev
+    pub steer: String, //TODO: Why is this a string and not a float? || steer -> steering_val
     pub is_ready: bool,
 }
 
@@ -292,6 +295,7 @@ impl I2CSensor {
     }
 }
 
+// TODO: ThermocoupleSensor -> MAX6675
 pub struct ThermocoupleSensor {
     cs_pin: rppal::gpio::OutputPin,
     clk_pin: rppal::gpio::OutputPin,
@@ -359,12 +363,15 @@ impl ThermocoupleSensor {
     }
 }
 
+
+// TODO: HallSensor -> A3144
+
 #[derive(Debug, Clone)]
 pub struct HallSensor {
     wheel_radius: f32,
     pub elapse: std::time::Duration,
     last_time: std::time::Instant,
-    pub km_per_hour: f32,
+    pub km_per_hour: f32, // TODO: km_per_hour -> hall_speed
 }
 
 impl HallSensor {
@@ -394,8 +401,9 @@ impl HallSensor {
     }
 }
 
+// TODO: BrakePressureSensor -> ADS1115
 pub struct BrakePressureSensor {
-    pub adc: Ads1x1x<I2cdev, Ads1115, Resolution16Bit, ads1x1x::mode::OneShot>,
+    pub adc: Ads1x1x<I2cdev, Ads1115, Resolution16Bit, ads1x1x::mode::OneShot>, // TODO: adc -> adc_ctx
     pub brake_pressure: f32,
 }
 
