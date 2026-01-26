@@ -183,7 +183,6 @@ impl BikeStateCtx {
     }
 }
 
-// TODO: WTGAHRS1 -> WTGAHRS1
 pub struct WTGAHRS1 {
     pub buffer: Vec<u8>,
 
@@ -245,9 +244,8 @@ impl WTGAHRS1 {
     }
 }
 
-// TODO: AS5600 -> AS5600
 pub struct AS5600 {
-    as5600_dev: LinuxI2CDevice, // TODO: as5600_dev -> as5600_dev
+    as5600_dev: LinuxI2CDevice,
     pub steering_val: String, //TODO: Why is this a string and not a float? || steering_val -> steering_val
     pub is_ready: bool,
 }
@@ -295,7 +293,6 @@ impl AS5600 {
     }
 }
 
-// TODO: MAX6675 -> MAX6675
 pub struct MAX6675 {
     cs_pin: rppal::gpio::OutputPin,
     clk_pin: rppal::gpio::OutputPin,
@@ -364,14 +361,13 @@ impl MAX6675 {
 }
 
 
-// TODO: A3144 -> A3144
 
 #[derive(Debug, Clone)]
 pub struct A3144 {
     wheel_radius: f32,
     pub elapse: std::time::Duration,
     last_time: std::time::Instant,
-    pub hall_speed: f32, // TODO: hall_speed -> hall_speed
+    pub hall_speed: f32,
 }
 
 impl A3144 {
@@ -401,9 +397,8 @@ impl A3144 {
     }
 }
 
-// TODO: ADS1115 -> ADS1115
 pub struct ADS1115 {
-    pub adc_ctx: Ads1x1x<I2cdev, Ads1115, Resolution16Bit, ads1x1x::mode::OneShot>, // TODO: adc_ctx -> adc_ctx
+    pub adc_ctx: Ads1x1x<I2cdev, Ads1115, Resolution16Bit, ads1x1x::mode::OneShot>,
     pub brake_pressure: f32,
 }
 

@@ -1,6 +1,3 @@
-// TESTING NEW CHANGES
-
-
 use std::{
     io::Read,
     sync::{Arc, Mutex},
@@ -372,11 +369,7 @@ fn display_task(bike_state_ctx: Arc<Mutex<BikeStateCtx>>) {
     }
 }
 
-async fn file_task(
-    bike_state_ctx: Arc<Mutex<BikeStateCtx>>,
-    notification: Arc<Notify>,
-    is_capturing_data: Arc<Mutex<bool>>,
-) {
+async fn file_task (bike_state_ctx: Arc<Mutex<BikeStateCtx>>, notification: Arc<Notify>, is_capturing_data: Arc<Mutex<bool>>) {
     loop {
         let should_capture = match is_capturing_data.lock() {
             Ok(guard) => *guard,
@@ -405,11 +398,7 @@ async fn file_task(
     }
 }
 
-async fn network_task(
-    bike_state_ctx: Arc<Mutex<BikeStateCtx>>,
-    notification: Arc<Notify>,
-    is_capturing_data: Arc<Mutex<bool>>,
-) {
+async fn network_task (bike_state_ctx: Arc<Mutex<BikeStateCtx>>, notification: Arc<Notify>, is_capturing_data: Arc<Mutex<bool>>) {
     let duration = Duration::from_millis(SEND_DATA_ONLINE_INTERVAL);
     let mut interval = tokio::time::interval(duration);
 
