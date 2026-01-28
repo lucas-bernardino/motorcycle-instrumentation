@@ -250,14 +250,14 @@ fn as5600_task(as5600_ctx: Arc<Mutex<AS5600>>, notification: Arc<Notify>) {
     loop {
         {
             match as5600_ctx.lock() {
-                Ok(mut i2c_lock) => {
-                    if let Err(e) = i2c_lock.update() {
+                Ok(mut as5600_ctx_lock) => {
+                    if let Err(e) = as5600_ctx_lock.update() {
                         println!(
                             "as5600_task: [ERROR] Failed to update as5600 struct: {}",
                             e
                         )
                     }
-                    i2c_lock.is_ready = true;
+                    as5600_ctx_lock.is_ready = true;
                     notification.notify_waiters();
                 }
                 Err(e) => {
