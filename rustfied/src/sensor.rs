@@ -18,13 +18,12 @@ use crate::utils::{clean_accel, clean_angle, clean_gps_vel, clean_vel};
 
 use rppal::gpio::Gpio;
 
-
 pub struct BikeStateCtx {
-    pub wtgahrs1: Arc<Mutex<WTGAHRS1>>, // uart, imu
-    pub as5600: Arc<Mutex<AS5600>>, // i2c, steering sensor
-    pub max6675: Arc<Mutex<MAX6675>>, // spi, thermocouple temperature sensor
-    pub a3144: Arc<Mutex<A3144>>, // digital (interrupt), hall sensor speed
-    pub ads1115: Arc<Mutex<ADS1115>>, // spi, brake pressure sensor
+    pub wtgahrs1: Arc<Mutex<WTGAHRS1>>,  // uart, imu
+    pub as5600: Arc<Mutex<AS5600>>,      // i2c, steering sensor
+    pub max6675: Arc<Mutex<MAX6675>>,    // spi, thermocouple temperature sensor
+    pub a3144: Arc<Mutex<A3144>>,        // digital (interrupt), hall sensor speed
+    pub ads1115: Arc<Mutex<ADS1115>>,    // spi, brake pressure sensor
     pub file: Arc<Mutex<std::fs::File>>, // save raw data
 
     pub counter: Arc<Mutex<i32>>,
@@ -32,12 +31,7 @@ pub struct BikeStateCtx {
 
 impl fmt::Display for BikeStateCtx {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Uart -> {}\nI2C -> {}",
-            self.wtgahrs1.lock().unwrap(),
-            self.as5600.lock().unwrap()
-        )
+        write!(f, "Uart -> {}\nI2C -> {}", self.wtgahrs1.lock().unwrap(), self.as5600.lock().unwrap())
     }
 }
 
@@ -52,10 +46,7 @@ impl BikeStateCtx {
             max6675: Arc::new(Mutex::new(MAX6675::new())),
             a3144: Arc::new(Mutex::new(A3144::new())),
             ads1115: Arc::new(Mutex::new(ADS1115::new())),
-            file: Arc::new(Mutex::new(
-                std::fs::File::create(file_name)
-                    .expect("Failed to create file with the given path"),
-            )),
+            file: Arc::new(Mutex::new(std::fs::File::create(file_name).expect("Failed to create file with the given path"))),
             counter: Arc::new(Mutex::new(0)),
         }
     }
@@ -85,13 +76,7 @@ impl BikeStateCtx {
             let time: DateTime<Local> = Local::now();
             let microsecond = time.nanosecond() / 1000;
 
-            let time_str = format!(
-                "{}:{}:{:02}.{:06}",
-                time.hour(),
-                time.minute(),
-                time.second(),
-                microsecond
-            );
+            let time_str = format!("{}:{}:{:02}.{:06}", time.hour(), time.minute(), time.second(), microsecond);
 
             a3144.calculate_speed();
 
@@ -103,13 +88,7 @@ impl BikeStateCtx {
 
             let data_to_file = format!(
                 "{}{}{}#{:.2}${:.2}!{:.2}@~{}\n",
-                uart_str,
-                time_str,
-                as5600.steering_val,
-                hall_rpm,
-                hall_speed,
-                max6675.thermocouple_temperature,
-                brake_press.brake_pressure
+                uart_str, time_str, as5600.steering_val, hall_rpm, hall_speed, max6675.thermocouple_temperature, brake_press.brake_pressure
             );
 
             // Print raw data to terminal
@@ -200,15 +179,7 @@ impl fmt::Display for WTGAHRS1 {
         write!(
             f,
             "Acceleration: [{}, {}, {}]\nAngle Velocity: [{}, {}, {}]\nAngle: [{}, {}, {}]\n",
-            self.acceleration[0],
-            self.acceleration[1],
-            self.acceleration[2],
-            self.angle_velocity[0],
-            self.angle_velocity[1],
-            self.angle_velocity[2],
-            self.angle[0],
-            self.angle[1],
-            self.angle[2]
+            self.acceleration[0], self.acceleration[1], self.acceleration[2], self.angle_velocity[0], self.angle_velocity[1], self.angle_velocity[2], self.angle[0], self.angle[1], self.angle[2]
         )
     }
 }
@@ -360,8 +331,6 @@ impl MAX6675 {
     }
 }
 
-
-
 #[derive(Debug, Clone)]
 pub struct A3144 {
     wheel_radius: f32,
@@ -404,16 +373,13 @@ pub struct ADS1115 {
 
 impl ADS1115 {
     pub fn new() -> Self {
-        let i2c_dev = I2cdev::new("/dev/i2c-1")
-            .expect("ADS1115: [ERROR] Failed to open /dev/i2c-1");
+        let i2c_dev = I2cdev::new("/dev/i2c-1").expect("ADS1115: [ERROR] Failed to open /dev/i2c-1");
         let mut adc_ctx = Ads1x1x::new_ads1115(i2c_dev, TargetAddr::default());
-        adc_ctx.set_full_scale_range(ads1x1x::FullScaleRange::Within4_096V)
+        adc_ctx
+            .set_full_scale_range(ads1x1x::FullScaleRange::Within4_096V)
             .expect("ADS1115: [ERROR] Failed to set_full_scale_range");
 
-        Self {
-            adc_ctx,
-            brake_pressure: 0.0,
-        }
+        Self { adc_ctx, brake_pressure: 0.0 }
     }
 
     pub fn update(&mut self) {

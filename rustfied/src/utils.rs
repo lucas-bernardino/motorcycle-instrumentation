@@ -69,13 +69,11 @@ fn get_raw_xyz_values(raw: &[u8]) -> Result<[i16; 3], &'static str> {
     Ok([raw_value_x, raw_value_y, raw_value_z])
 }
 
-pub fn init_ssd1306_display(
-) -> Ssd1306<I2CInterface<I2cdev>, DisplaySize128x64, BufferedGraphicsMode<DisplaySize128x64>> {
+pub fn init_ssd1306_display() -> Ssd1306<I2CInterface<I2cdev>, DisplaySize128x64, BufferedGraphicsMode<DisplaySize128x64>> {
     let as5600 = I2cdev::new("/dev/i2c-1").unwrap();
 
     let interface = I2CDisplayInterface::new(as5600);
-    let mut disp = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)
-        .into_buffered_graphics_mode();
+    let mut disp = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0).into_buffered_graphics_mode();
     disp.init().unwrap();
 
     disp
