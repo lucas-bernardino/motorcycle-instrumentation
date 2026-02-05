@@ -76,8 +76,6 @@ async fn main() {
     let a3144_ctx = Arc::clone(&bike_state_ctx.lock().expect("main: [ERROR] Failed to get bike_state_ctx lock").a3144);
 
     let wtgahrs1_notify = Arc::clone(&notify);
-    let as5600_notify = Arc::clone(&notify);
-    let network_notify = Arc::clone(&notify);
 
     let is_capturing_data = Arc::new(Mutex::new(true));
     let is_capturing_data_file_clone = Arc::clone(&is_capturing_data);
@@ -115,7 +113,7 @@ async fn main() {
     });
 
     let as5600_task_handler = tokio::task::spawn_blocking(move || {
-        as5600_task(as5600_ctx, as5600_notify);
+        as5600_task(as5600_ctx);
     });
 
     let max6675_task_handler = tokio::task::spawn_blocking(move || {
@@ -138,7 +136,7 @@ async fn main() {
     // network_task_handler. Othersise, run without this task.
     if mode_arg {
         let network_task_handler = tokio::spawn(async move {
-            network_task(network_ctx_clone, network_notify, is_capturing_data_network_clone).await;
+            network_task(network_ctx_clone, is_capturing_data_network_clone).await;
         });
 
         let _ = tokio::join!(
@@ -202,7 +200,7 @@ fn wtgahrs1_task(wtgahrs1_ctx: Arc<Mutex<WTGAHRS1>>, notification: Arc<Notify>) 
     }
 }
 
-fn as5600_task(as5600_ctx: Arc<Mutex<AS5600>>, notification: Arc<Notify>) {
+fn as5600_task(as5600_ctx: Arc<Mutex<AS5600>>) {
     loop {
         {
             match as5600_ctx.lock() {
@@ -211,7 +209,6 @@ fn as5600_task(as5600_ctx: Arc<Mutex<AS5600>>, notification: Arc<Notify>) {
                         println!("as5600_task: [ERROR] Failed to update as5600 struct: {}", e)
                     }
                     as5600_ctx_lock.is_ready = true;
-                    notification.notify_waiters();
                 }
                 Err(e) => {
                     println!("as5600_task: [ERROR] Failed to get as5600 lock: {e}")
@@ -316,7 +313,7 @@ async fn file_task(bike_state_ctx: Arc<Mutex<BikeStateCtx>>, notification: Arc<N
     }
 }
 
-async fn network_task(bike_state_ctx: Arc<Mutex<BikeStateCtx>>, notification: Arc<Notify>, is_capturing_data: Arc<Mutex<bool>>) {
+async fn network_task(bike_state_ctx: Arc<Mutex<BikeStateCtx>>, is_capturing_data: Arc<Mutex<bool>>) {
     let duration = Duration::from_millis(SEND_DATA_ONLINE_INTERVAL);
     let mut interval = tokio::time::interval(duration);
 
@@ -351,7 +348,6 @@ async fn network_task(bike_state_ctx: Arc<Mutex<BikeStateCtx>>, notification: Ar
         };
 
         if should_capture {
-            notification.notified().await;
             interval.tick().await;
             let sensor_json = bike_state_ctx.lock().unwrap().get_json().expect("Failed to parse to json");
 

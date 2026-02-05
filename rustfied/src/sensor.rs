@@ -80,7 +80,7 @@ impl BikeStateCtx {
 
             a3144.calculate_speed();
 
-            let mut hall_speed = a3144.hall_speed;
+            let hall_speed = a3144.hall_speed;
             let mut hall_rpm = 60000.0 / a3144.elapse.as_millis() as f32;
             if hall_rpm.is_infinite() {
                 hall_rpm = 0.0;
@@ -111,10 +111,6 @@ impl BikeStateCtx {
         let brake_pressure_sensor = self.ads1115.lock()?;
 
         let mut counter = self.counter.lock()?;
-
-        //'18:25:52.843023'
-        let time: DateTime<Local> = Local::now();
-        let time_str = format!("{}:{}:{}", time.hour(), time.minute(), time.second(),);
 
         a3144.calculate_speed();
         let hall_speed = a3144.hall_speed;
