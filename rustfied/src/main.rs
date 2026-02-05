@@ -353,9 +353,9 @@ async fn network_task(bike_state_ctx: Arc<Mutex<BikeStateCtx>>, is_capturing_dat
 
             if let Err(e) = socket.emit("send", sensor_json).await {
                 println!("Error while trying to send socket: {}", e);
-                std::thread::sleep(Duration::from_secs(1));
+                tokio::time::sleep(Duration::from_secs(1)).await;
                 socket = create_socket().await;
-                std::thread::sleep(Duration::from_secs(1));
+                tokio::time::sleep(Duration::from_secs(1)).await;
             }
             println!("Last line of the loop")
         }
