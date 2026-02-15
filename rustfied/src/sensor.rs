@@ -14,7 +14,7 @@ use serde_json::json;
 use i2cdev::core::*;
 use i2cdev::linux::LinuxI2CDevice;
 
-use crate::utils::{clean_accel, clean_angle, clean_gps_vel, clean_vel};
+use crate::utils::{clean_accel, clean_angle, clean_atm_press_and_altitude, clean_longitude_latitude, clean_mag, clean_vel, clean_vel_gps};
 
 use rppal::gpio::Gpio;
 
@@ -112,6 +112,11 @@ impl BikeStateCtx {
 
         let mut counter = self.counter.lock()?;
 
+        let time: DateTime<Local> = Local::now();
+        let microsecond = time.nanosecond() / 1000;
+        let time_str = format!("{}:{}:{:02}.{:06}", time.hour(), time.minute(), time.second(), microsecond);
+
+
         a3144.calculate_speed();
         let hall_speed = a3144.hall_speed;
         let mut hall_rpm = 60000.0 / a3144.elapse.as_millis() as f32;
@@ -124,23 +129,25 @@ impl BikeStateCtx {
             "acel_x": wtgahrs1.acceleration[0],
             "acel_y": wtgahrs1.acceleration[1],
             "acel_z": wtgahrs1.acceleration[2],
+            "temp": wtgahrs1.temperature,
             "vel_x": wtgahrs1.angle_velocity[0],
             "vel_y": wtgahrs1.angle_velocity[1],
             "vel_z": wtgahrs1.angle_velocity[2],
             "roll": wtgahrs1.angle[0],
-            "pitch": wtgahrs1.angle[0],
-            "yaw": wtgahrs1.angle[0],
-            "mag_x": 0.0,
-            "mag_y": 0.0,
-            "mag_z": 0.0,
-            "temp": 0.0,
+            "pitch": wtgahrs1.angle[1],
+            "yaw": wtgahrs1.angle[2],
+            "mag_x": wtgahrs1.mag[0],
+            "mag_y": wtgahrs1.mag[1],
+            "mag_z": wtgahrs1.mag[2],
+            "press_ar": wtgahrs1.atm_press,
+            "altitude": wtgahrs1.altitude,
+            "long": wtgahrs1.longitude,
+            "lat": wtgahrs1.latitude,
+            "veloc": wtgahrs1.gps_vel,
             "esterc": as5600.steering_val,
+            "Horario": time_str,
             "rot": format!("{:.2}", hall_rpm),
-            "veloc": 0.0,
-            "long": 0.0,
-            "lat": 0.0,
             "veloc_hall": format!("{:.2}", hall_speed),
-            "altitude": 0.0,
             "termopar1": max6675.thermocouple_temperature,
             "brake_pressure" :((brake_pressure_sensor.brake_pressure - 0.376) / 0.05).abs(),
         });
@@ -162,9 +169,14 @@ pub struct WTGAHRS1 {
     pub buffer: Vec<u8>,
 
     pub acceleration: [f32; 3],
+    pub temperature: f32,
     pub angle_velocity: [f32; 3],
     pub angle: [f32; 3],
-
+    pub mag: [f32; 3],
+    pub atm_press: f32,
+    pub altitude: f32,
+    pub longitude: f32,
+    pub latitude: f32,
     pub gps_vel: f32,
 
     pub is_ready: bool,
@@ -189,8 +201,14 @@ impl WTGAHRS1 {
         WTGAHRS1 {
             buffer: buff,
             acceleration: [0.0; 3],
+            temperature: 0.0,
             angle_velocity: [0.0; 3],
             angle: [0.0; 3],
+            mag: [0.0; 3],
+            atm_press: 0.0,
+            altitude: 0.0,
+            longitude: 0.0,
+            latitude: 0.0,
             gps_vel: 0.0,
             is_ready: true,
         }
@@ -200,12 +218,18 @@ impl WTGAHRS1 {
         let accel_raw = &self.buffer[0..11];
         let angle_vel_raw = &self.buffer[11..22];
         let angle_raw = &self.buffer[22..33];
+        let mag_raw = &self.buffer[33..44];
+        let atm_press_and_altitude_raw = &self.buffer[44..55];
+        let longitude_latitude_raw = &self.buffer[55..66];
         let gps_vel_raw = &self.buffer[66..77];
 
-        self.acceleration = clean_accel(accel_raw)?;
+        (self.acceleration, self.temperature) = clean_accel(accel_raw)?;
         self.angle_velocity = clean_vel(angle_vel_raw)?;
         self.angle = clean_angle(angle_raw)?;
-        self.gps_vel = clean_gps_vel(gps_vel_raw)?;
+        self.mag = clean_mag(mag_raw)?;
+        [self.atm_press, self.altitude] = clean_atm_press_and_altitude(atm_press_and_altitude_raw)?;
+        [self.longitude, self.latitude] = clean_longitude_latitude(longitude_latitude_raw)?;
+        self.gps_vel = clean_vel_gps(gps_vel_raw)?;
 
         Ok(())
     }
