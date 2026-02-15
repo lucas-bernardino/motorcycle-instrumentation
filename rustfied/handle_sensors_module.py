@@ -115,14 +115,34 @@ def handleSensor5(sensor_list):
 
 
 def handleSensor6(sensor_list):
-    longtitude = float((int("0x" + sensor_list[10:12], 16) << 24 ) | int("0x" + sensor_list[8:10], 16) << 16  | int("0x" + sensor_list[6:8], 16) << 8  | int("0x" + sensor_list[4:6], 16))  
+    longitude = float((int("0x" + sensor_list[10:12], 16) << 24 ) | int("0x" + sensor_list[8:10], 16) << 16  | int("0x" + sensor_list[6:8], 16) << 8  | int("0x" + sensor_list[4:6], 16))  
     latitude = float((int("0x" + sensor_list[18:20], 16) << 24 ) | int("0x" + sensor_list[16:18], 16) << 16  | int("0x" + sensor_list[14:16], 16) << 8  | int("0x" + sensor_list[12:14], 16))
-    return [longtitude, latitude]
+    
+    longitude = parse_gps(longitude)
+    latitude = parse_gps(latitude)
+    
+    return [longitude, latitude]
 
 def handleSensor7(sensor_list):
     velocidade_gps = float((int("0x" + sensor_list[18:20], 16) << 24 ) | int("0x" + sensor_list[16:18], 16) << 16  | int("0x" + sensor_list[14:16], 16) << 8  | int("0x" + sensor_list[12:14], 16)) / 1000
     return velocidade_gps
 
+def parse_gps(_val):
+    # check for unsigned   
+    if _val >= 0x80000000:
+        _val -= 0x100000000
+
+    sign = -1 if _val < 0 else 1
+    _val = abs(_val)
+
+    # datasheet
+    dd = _val // 10_000_000 
+    mm = (_val % 10_000_000) / 100_000
+
+    # 1 degree = 60 min, convert mm to degrees
+    _val = sign * (dd + mm / 60.0)
+        
+    return _val
 
 # acel_x, acel_y, acel_z, temp = handleSensor1(data[0:22])
 # vel_x, vel_y, vel_z = handleSensor2(data[22:44])
