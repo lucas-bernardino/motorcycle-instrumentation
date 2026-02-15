@@ -67,12 +67,15 @@ pub fn clean_atm_press_and_altitude(raw: &[u8]) -> Result<[f32; 2], &'static str
     Ok([atm_press, altitude])
 }
 
-pub fn clean_longitude_latitude(raw: &[u8]) -> Result<[f32; 2], &'static str> {
+pub fn clean_longitude_latitude(raw: &[u8]) -> Result<[f64; 2], &'static str> {
     let [longitude_val, latitude_val] = parse_four_bytes_format_from_packet(raw)?[..] else {
         return Err("Failed to destruct vec");
     };
 
-    Ok([longitude_val as f32, latitude_val as f32])
+    let longitude = parse_gps(longitude_val);
+    let latitude = parse_gps(latitude_val);
+
+    Ok([longitude, latitude])
 }
 
 pub fn clean_vel_gps(raw: &[u8]) -> Result<f32, &'static str> {
@@ -122,6 +125,17 @@ fn parse_four_bytes_format_from_packet(raw: &[u8]) -> Result<[i32; 2], &'static 
     let second_value = (raw_value_3 | raw_value_2 | raw_value_1 | raw_value_0) as i32;
     Ok([first_value, second_value])    
 }
+
+fn parse_gps(val: i32) -> f64 {
+    let sign = if val < 0 { -1.0 } else { 1.0 };
+    let abs = val.abs() as f64;
+
+    let degrees = (abs / 10_000_000.0).floor();
+    let minutes = (abs % 10_000_000.0) / 100_000.0;
+
+    sign * (degrees + minutes / 60.0)
+}
+
 
 pub fn init_ssd1306_display() -> Ssd1306<I2CInterface<I2cdev>, DisplaySize128x64, BufferedGraphicsMode<DisplaySize128x64>> {
     let as5600 = I2cdev::new("/dev/i2c-1").unwrap();

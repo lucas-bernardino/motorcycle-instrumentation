@@ -175,8 +175,8 @@ pub struct WTGAHRS1 {
     pub mag: [f32; 3],
     pub atm_press: f32,
     pub altitude: f32,
-    pub longitude: f32,
-    pub latitude: f32,
+    pub longitude: f64,
+    pub latitude: f64,
     pub gps_vel: f32,
 
     pub is_ready: bool,
