@@ -110,19 +110,18 @@ fn parse_two_bytes_format_from_packet(raw: &[u8]) -> Result<[i16; 4], &'static s
 }
 
 fn parse_four_bytes_format_from_packet(raw: &[u8]) -> Result<[i32; 2], &'static str> {
-    let raw_value_3 = raw.get(5).ok_or("Missing byte")? << 24;
-    let raw_value_2 = raw.get(4).ok_or("Missing byte")? << 16;
-    let raw_value_1 = raw.get(3).ok_or("Missing byte")? << 8;
-    let raw_value_0 = raw.get(2).ok_or("Missing byte")? << 0;
+    let first_value =
+        ((*raw.get(5).ok_or("Missing byte")? as i32) << 24) |
+        ((*raw.get(4).ok_or("Missing byte")? as i32) << 16) |
+        ((*raw.get(3).ok_or("Missing byte")? as i32) << 8)  |
+        ((*raw.get(2).ok_or("Missing byte")? as i32) << 0);
 
-    let first_value = (raw_value_3 | raw_value_2 | raw_value_1 | raw_value_0) as i32;
+    let second_value =
+        ((*raw.get(9).ok_or("Missing byte")? as i32) << 24) |
+        ((*raw.get(8).ok_or("Missing byte")? as i32) << 16) |
+        ((*raw.get(7).ok_or("Missing byte")? as i32) << 8)  |
+        ((*raw.get(6).ok_or("Missing byte")? as i32) << 0);
 
-    let raw_value_3 = raw.get(9).ok_or("Missing byte")? << 24;
-    let raw_value_2 = raw.get(8).ok_or("Missing byte")? << 16;
-    let raw_value_1 = raw.get(7).ok_or("Missing byte")? << 8;
-    let raw_value_0 = raw.get(6).ok_or("Missing byte")? << 0;
-
-    let second_value = (raw_value_3 | raw_value_2 | raw_value_1 | raw_value_0) as i32;
     Ok([first_value, second_value])    
 }
 
