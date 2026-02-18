@@ -183,12 +183,39 @@ app.get("/download", async (req, res) => {
     for (const doc of collectionData) {
       delete doc._id;
       delete doc.id;
-      doc["createdAt"] = String(doc["createdAt"])
       delete doc.updatedAt;
+      delete doc.createdAt;
       delete doc.__v;
     }
 
-    const df = pl.DataFrame(collectionData);
+    let df = pl.DataFrame(collectionData);
+    // renaming to match csv column names in lavisualizar app so the charts can be correctly rendered
+    df = df.rename({
+      "acel_x": "Aceleracao X",
+      "acel_y": "Aceleracao Y",
+      "acel_z": "Aceleracao Z",
+      "temp": "Temperatura",
+      "vel_x": "Velocidade X",
+      "vel_y": "Velocidade Y",
+      "vel_z": "Velocidade Z",
+      "roll": "Roll",
+      "pitch": "Pitch",
+      "yaw": "Yall",
+      "mag_x": "Magnetico X",
+      "mag_y": "Magnetico Y",
+      "mag_z": "Magnetico Z",
+      "press_ar": "Pressao do Ar",
+      "altitude": "Altitude",
+      "long": "Longitude",
+      "lat": "Latitude",
+      "veloc": "Velocidade GPS",
+      "esterc": "Angulo",
+      "Horario": "Horario",
+      "rot": "RPM",
+      "veloc_hall": "Velocidade Hall",
+      "termopar1": "Temperatura Disco",
+      "brake_pressure" : "Pressao Freio",
+    });
     const csvData = df.toCSV();
 
     res.setHeader("Content-Disposition", 'attachment; filename="data.csv"');

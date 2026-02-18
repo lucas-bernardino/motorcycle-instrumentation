@@ -14,47 +14,39 @@ use serde_json::json;
 use i2cdev::core::*;
 use i2cdev::linux::LinuxI2CDevice;
 
-use crate::utils::{clean_accel, clean_angle, clean_gps_vel, clean_vel};
+use crate::utils::{clean_accel, clean_angle, clean_atm_press_and_altitude, clean_longitude_latitude, clean_mag, clean_vel, clean_vel_gps};
 
 use rppal::gpio::Gpio;
 
-pub struct BikeSensor {
-    pub uart: Arc<Mutex<UartSensor>>,
-    pub i2c: Arc<Mutex<I2CSensor>>,
-    pub thermocouple: Arc<Mutex<ThermocoupleSensor>>,
-    pub hall: Arc<Mutex<HallSensor>>,
-    pub brake_pressure: Arc<Mutex<BrakePressureSensor>>,
-    pub file: Arc<Mutex<std::fs::File>>,
+pub struct BikeStateCtx {
+    pub wtgahrs1: Arc<Mutex<WTGAHRS1>>,  // uart, imu
+    pub as5600: Arc<Mutex<AS5600>>,      // i2c, steering sensor
+    pub max6675: Arc<Mutex<MAX6675>>,    // spi, thermocouple temperature sensor
+    pub a3144: Arc<Mutex<A3144>>,        // digital (interrupt), hall sensor speed
+    pub ads1115: Arc<Mutex<ADS1115>>,    // spi, brake pressure sensor
+    pub file: Arc<Mutex<std::fs::File>>, // save raw data
 
     pub counter: Arc<Mutex<i32>>,
 }
 
-impl fmt::Display for BikeSensor {
+impl fmt::Display for BikeStateCtx {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Uart -> {}\nI2C -> {}",
-            self.uart.lock().unwrap(),
-            self.i2c.lock().unwrap()
-        )
+        write!(f, "Uart -> {}\nI2C -> {}", self.wtgahrs1.lock().unwrap(), self.as5600.lock().unwrap())
     }
 }
 
-impl BikeSensor {
-    pub fn new() -> BikeSensor {
+impl BikeStateCtx {
+    pub fn new() -> BikeStateCtx {
         let time: DateTime<Local> = Local::now();
         let file_name = format!("{}-{}-{}.txt", time.hour(), time.minute(), time.second(),);
 
-        BikeSensor {
-            uart: Arc::new(Mutex::new(UartSensor::new())),
-            i2c: Arc::new(Mutex::new(I2CSensor::new())),
-            thermocouple: Arc::new(Mutex::new(ThermocoupleSensor::new())),
-            hall: Arc::new(Mutex::new(HallSensor::new())),
-            brake_pressure: Arc::new(Mutex::new(BrakePressureSensor::new())),
-            file: Arc::new(Mutex::new(
-                std::fs::File::create(file_name)
-                    .expect("Failed to create file with the given path"),
-            )),
+        BikeStateCtx {
+            wtgahrs1: Arc::new(Mutex::new(WTGAHRS1::new())),
+            as5600: Arc::new(Mutex::new(AS5600::new())),
+            max6675: Arc::new(Mutex::new(MAX6675::new())),
+            a3144: Arc::new(Mutex::new(A3144::new())),
+            ads1115: Arc::new(Mutex::new(ADS1115::new())),
+            file: Arc::new(Mutex::new(std::fs::File::create(file_name).expect("Failed to create file with the given path"))),
             counter: Arc::new(Mutex::new(0)),
         }
     }
@@ -69,14 +61,14 @@ impl BikeSensor {
     }
 
     pub fn write_file(&self) -> Result<(), Box<dyn std::error::Error + '_>> {
-        let mut uart = self.uart.lock()?;
-        let mut i2c = self.i2c.lock()?;
-        let thermocouple = self.thermocouple.lock()?;
-        let mut hall = self.hall.lock()?;
-        let brake_press = self.brake_pressure.lock()?;
+        let mut wtgahrs1 = self.wtgahrs1.lock()?;
+        let mut as5600 = self.as5600.lock()?;
+        let max6675 = self.max6675.lock()?;
+        let mut a3144 = self.a3144.lock()?;
+        let brake_press = self.ads1115.lock()?;
 
-        if uart.is_ready && i2c.is_ready {
-            let uart_str = uart.buffer.iter().fold(String::new(), |mut output, b| {
+        if wtgahrs1.is_ready && as5600.is_ready {
+            let uart_str = wtgahrs1.buffer.iter().fold(String::new(), |mut output, b| {
                 let _ = write!(output, "{b:02x}");
                 output
             });
@@ -84,31 +76,19 @@ impl BikeSensor {
             let time: DateTime<Local> = Local::now();
             let microsecond = time.nanosecond() / 1000;
 
-            let time_str = format!(
-                "{}:{}:{:02}.{:06}",
-                time.hour(),
-                time.minute(),
-                time.second(),
-                microsecond
-            );
+            let time_str = format!("{}:{}:{:02}.{:06}", time.hour(), time.minute(), time.second(), microsecond);
 
-            hall.calculate_speed();
+            a3144.calculate_speed();
 
-            let mut hall_speed = hall.km_per_hour;
-            let mut hall_rpm = 60000.0 / hall.elapse.as_millis() as f32;
+            let hall_speed = a3144.hall_speed;
+            let mut hall_rpm = 60000.0 / a3144.elapse.as_millis() as f32;
             if hall_rpm.is_infinite() {
                 hall_rpm = 0.0;
             }
 
             let data_to_file = format!(
                 "{}{}{}#{:.2}${:.2}!{:.2}@~{}\n",
-                uart_str,
-                time_str,
-                i2c.steer,
-                hall_rpm,
-                hall_speed,
-                thermocouple.thermocouple_temperature,
-                brake_press.brake_pressure
+                uart_str, time_str, as5600.steering_val, hall_rpm, hall_speed, max6675.thermocouple_temperature, brake_press.brake_pressure
             );
 
             // Print raw data to terminal
@@ -116,56 +96,59 @@ impl BikeSensor {
 
             self.file.lock()?.write_all(data_to_file.as_bytes())?;
 
-            uart.is_ready = false;
-            i2c.is_ready = false;
+            wtgahrs1.is_ready = false;
+            as5600.is_ready = false;
         }
         Ok(())
     }
 
     pub fn get_json(&self) -> Result<serde_json::Value, Box<dyn std::error::Error + '_>> {
-        let uart = self.uart.lock()?;
-        let i2c = self.i2c.lock()?;
-        let thermocouple = self.thermocouple.lock()?;
-        let mut hall = self.hall.lock()?;
+        let wtgahrs1 = self.wtgahrs1.lock()?;
+        let as5600 = self.as5600.lock()?;
+        let max6675 = self.max6675.lock()?;
+        let mut a3144 = self.a3144.lock()?;
 
-        let brake_pressure_sensor = self.brake_pressure.lock()?;
+        let brake_pressure_sensor = self.ads1115.lock()?;
 
         let mut counter = self.counter.lock()?;
 
-        //'18:25:52.843023'
         let time: DateTime<Local> = Local::now();
-        let time_str = format!("{}:{}:{}", time.hour(), time.minute(), time.second(),);
+        let microsecond = time.nanosecond() / 1000;
+        let time_str = format!("{}:{}:{:02}.{:06}", time.hour(), time.minute(), time.second(), microsecond);
 
-        hall.calculate_speed();
-        let hall_speed = hall.km_per_hour;
-        let mut hall_rpm = 60000.0 / hall.elapse.as_millis() as f32;
+
+        a3144.calculate_speed();
+        let hall_speed = a3144.hall_speed;
+        let mut hall_rpm = 60000.0 / a3144.elapse.as_millis() as f32;
         if hall_rpm.is_infinite() {
             hall_rpm = 0.0;
         }
 
         let json = json!({
             "id": *counter,
-            "acel_x": uart.acceleration[0],
-            "acel_y": uart.acceleration[1],
-            "acel_z": uart.acceleration[2],
-            "vel_x": uart.angle_velocity[0],
-            "vel_y": uart.angle_velocity[1],
-            "vel_z": uart.angle_velocity[2],
-            "roll": uart.angle[0],
-            "pitch": uart.angle[0],
-            "yaw": uart.angle[0],
-            "mag_x": 0.0,
-            "mag_y": 0.0,
-            "mag_z": 0.0,
-            "temp": 0.0,
-            "esterc": i2c.steer,
+            "acel_x": wtgahrs1.acceleration[0],
+            "acel_y": wtgahrs1.acceleration[1],
+            "acel_z": wtgahrs1.acceleration[2],
+            "temp": wtgahrs1.temperature,
+            "vel_x": wtgahrs1.angle_velocity[0],
+            "vel_y": wtgahrs1.angle_velocity[1],
+            "vel_z": wtgahrs1.angle_velocity[2],
+            "roll": wtgahrs1.angle[0],
+            "pitch": wtgahrs1.angle[1],
+            "yaw": wtgahrs1.angle[2],
+            "mag_x": wtgahrs1.mag[0],
+            "mag_y": wtgahrs1.mag[1],
+            "mag_z": wtgahrs1.mag[2],
+            "press_ar": wtgahrs1.atm_press,
+            "altitude": wtgahrs1.altitude,
+            "long": wtgahrs1.longitude,
+            "lat": wtgahrs1.latitude,
+            "veloc": wtgahrs1.gps_vel,
+            "esterc": as5600.steering_val,
+            "Horario": time_str,
             "rot": format!("{:.2}", hall_rpm),
-            "veloc": 0.0,
-            "long": 0.0,
-            "lat": 0.0,
             "veloc_hall": format!("{:.2}", hall_speed),
-            "altitude": 0.0,
-            "termopar1": thermocouple.thermocouple_temperature,
+            "termopar1": max6675.thermocouple_temperature,
             "brake_pressure" :((brake_pressure_sensor.brake_pressure - 0.376) / 0.05).abs(),
         });
 
@@ -174,55 +157,58 @@ impl BikeSensor {
     }
 
     pub fn get_display_data(&self) -> Result<[f32; 2], Box<dyn std::error::Error + '_>> {
-        let uart = self.uart.lock()?;
-        let mut hall = self.hall.lock()?;
-        hall.calculate_speed();
+        let wtgahrs1 = self.wtgahrs1.lock()?;
+        let mut a3144 = self.a3144.lock()?;
+        a3144.calculate_speed();
 
-        Ok([uart.gps_vel, hall.km_per_hour])
+        Ok([wtgahrs1.gps_vel, a3144.hall_speed])
     }
 }
 
-pub struct UartSensor {
+pub struct WTGAHRS1 {
     pub buffer: Vec<u8>,
 
     pub acceleration: [f32; 3],
+    pub temperature: f32,
     pub angle_velocity: [f32; 3],
     pub angle: [f32; 3],
-
+    pub mag: [f32; 3],
+    pub atm_press: f32,
+    pub altitude: f32,
+    pub longitude: f64,
+    pub latitude: f64,
     pub gps_vel: f32,
 
     pub is_ready: bool,
 }
 
-impl fmt::Display for UartSensor {
+impl fmt::Display for WTGAHRS1 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "Acceleration: [{}, {}, {}]\nAngle Velocity: [{}, {}, {}]\nAngle: [{}, {}, {}]\n",
-            self.acceleration[0],
-            self.acceleration[1],
-            self.acceleration[2],
-            self.angle_velocity[0],
-            self.angle_velocity[1],
-            self.angle_velocity[2],
-            self.angle[0],
-            self.angle[1],
-            self.angle[2]
+            self.acceleration[0], self.acceleration[1], self.acceleration[2], self.angle_velocity[0], self.angle_velocity[1], self.angle_velocity[2], self.angle[0], self.angle[1], self.angle[2]
         )
     }
 }
 
-impl UartSensor {
-    pub fn new() -> UartSensor {
+impl WTGAHRS1 {
+    pub fn new() -> WTGAHRS1 {
         let mut buff: Vec<u8> = vec![0; 86];
         buff.insert(0, 0x55);
         buff.insert(1, 0x51);
 
-        UartSensor {
+        WTGAHRS1 {
             buffer: buff,
             acceleration: [0.0; 3],
+            temperature: 0.0,
             angle_velocity: [0.0; 3],
             angle: [0.0; 3],
+            mag: [0.0; 3],
+            atm_press: 0.0,
+            altitude: 0.0,
+            longitude: 0.0,
+            latitude: 0.0,
             gps_vel: 0.0,
             is_ready: true,
         }
@@ -232,43 +218,49 @@ impl UartSensor {
         let accel_raw = &self.buffer[0..11];
         let angle_vel_raw = &self.buffer[11..22];
         let angle_raw = &self.buffer[22..33];
+        let mag_raw = &self.buffer[33..44];
+        let atm_press_and_altitude_raw = &self.buffer[44..55];
+        let longitude_latitude_raw = &self.buffer[55..66];
         let gps_vel_raw = &self.buffer[66..77];
 
-        self.acceleration = clean_accel(accel_raw)?;
+        (self.acceleration, self.temperature) = clean_accel(accel_raw)?;
         self.angle_velocity = clean_vel(angle_vel_raw)?;
         self.angle = clean_angle(angle_raw)?;
-        self.gps_vel = clean_gps_vel(gps_vel_raw)?;
+        self.mag = clean_mag(mag_raw)?;
+        [self.atm_press, self.altitude] = clean_atm_press_and_altitude(atm_press_and_altitude_raw)?;
+        [self.longitude, self.latitude] = clean_longitude_latitude(longitude_latitude_raw)?;
+        self.gps_vel = clean_vel_gps(gps_vel_raw)?;
 
         Ok(())
     }
 }
 
-pub struct I2CSensor {
-    i2c_device: LinuxI2CDevice,
-    pub steer: String,
+pub struct AS5600 {
+    as5600_dev: LinuxI2CDevice,
+    pub steering_val: String, //TODO: Why is this a string and not a float? || steering_val -> steering_val
     pub is_ready: bool,
 }
 
-impl fmt::Display for I2CSensor {
+impl fmt::Display for AS5600 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Steer: {}", self.steer)
+        write!(f, "Steer: {}", self.steering_val)
     }
 }
 
-impl I2CSensor {
-    pub fn new() -> I2CSensor {
-        let steer = String::from("1.0");
-        let i2c_device = LinuxI2CDevice::new("/dev/i2c-1", 0x36).expect("Failed to connect to I2C");
-        I2CSensor {
-            i2c_device,
-            steer,
+impl AS5600 {
+    pub fn new() -> AS5600 {
+        let steering_val = String::from("1.0");
+        let as5600_dev = LinuxI2CDevice::new("/dev/i2c-1", 0x36).expect("Failed to connect to I2C");
+        AS5600 {
+            as5600_dev,
+            steering_val,
             is_ready: true,
         }
     }
 
     pub fn update(&mut self) -> Result<(), String> {
-        match self.i2c_device.smbus_read_byte_data(0x0C) {
-            Ok(high_byte_reading) => match self.i2c_device.smbus_read_byte_data(0x0D) {
+        match self.as5600_dev.smbus_read_byte_data(0x0C) {
+            Ok(high_byte_reading) => match self.as5600_dev.smbus_read_byte_data(0x0D) {
                 Ok(low_byte_reading) => {
                     let high_byte = (high_byte_reading as u16) << 8;
                     let low_byte = low_byte_reading as u16;
@@ -276,50 +268,50 @@ impl I2CSensor {
                     let raw_angle = high_byte | low_byte;
                     let angle_degrees = ((raw_angle & 0xFFF) as f64) * 0.08789;
 
-                    self.steer = format!("{:.2}", angle_degrees);
+                    self.steering_val = format!("{:.2}", angle_degrees);
                     Ok(())
                 }
                 Err(e) => {
-                    let err_msg = format!("I2CSensor: [ERROR] Failed to read 0x0D register: {e}");
+                    let err_msg = format!("AS5600: [ERROR] Failed to read 0x0D register: {e}");
                     return Err(err_msg);
                 }
             },
             Err(e) => {
-                let err_msg = format!("I2CSensor: [ERROR] Failed to read 0x0C register: {e}");
+                let err_msg = format!("AS5600: [ERROR] Failed to read 0x0C register: {e}");
                 return Err(err_msg);
             }
         }
     }
 }
 
-pub struct ThermocoupleSensor {
+pub struct MAX6675 {
     cs_pin: rppal::gpio::OutputPin,
     clk_pin: rppal::gpio::OutputPin,
     data_pin: rppal::gpio::InputPin,
     pub thermocouple_temperature: f32,
 }
 
-impl ThermocoupleSensor {
-    pub fn new() -> ThermocoupleSensor {
+impl MAX6675 {
+    pub fn new() -> MAX6675 {
         let mut cs_pin = Gpio::new()
-            .expect("ThermocoupleSensor: [ERROR] Failed to create GPIO")
+            .expect("MAX6675: [ERROR] Failed to create GPIO")
             .get(27)
-            .expect("ThermocoupleSensor: [ERROR] Failed to use GPIO 27")
+            .expect("MAX6675: [ERROR] Failed to use GPIO 27")
             .into_output();
         let clk_pin = Gpio::new()
-            .expect("ThermocoupleSensor: [ERROR] Failed to create GPIO")
+            .expect("MAX6675: [ERROR] Failed to create GPIO")
             .get(17)
-            .expect("ThermocoupleSensor: [ERROR] Failed to use GPIO 17")
+            .expect("MAX6675: [ERROR] Failed to use GPIO 17")
             .into_output();
         let data_pin = Gpio::new()
-            .expect("ThermocoupleSensor: [ERROR] Failed to create GPIO")
+            .expect("MAX6675: [ERROR] Failed to create GPIO")
             .get(22)
-            .expect("ThermocoupleSensor: [ERROR] Failed to use GPIO 22")
+            .expect("MAX6675: [ERROR] Failed to use GPIO 22")
             .into_input();
 
         cs_pin.set_high();
 
-        ThermocoupleSensor {
+        MAX6675 {
             cs_pin,
             clk_pin,
             data_pin,
@@ -360,20 +352,20 @@ impl ThermocoupleSensor {
 }
 
 #[derive(Debug, Clone)]
-pub struct HallSensor {
+pub struct A3144 {
     wheel_radius: f32,
     pub elapse: std::time::Duration,
     last_time: std::time::Instant,
-    pub km_per_hour: f32,
+    pub hall_speed: f32,
 }
 
-impl HallSensor {
+impl A3144 {
     pub fn new() -> Self {
         Self {
             wheel_radius: 32.0,
             elapse: std::time::Duration::ZERO,
             last_time: std::time::Instant::now(),
-            km_per_hour: 0.0,
+            hall_speed: 0.0,
         }
     }
 
@@ -389,32 +381,29 @@ impl HallSensor {
             let circ_cm = 2.0 * std::f32::consts::PI * self.wheel_radius;
             let dist_km = circ_cm / 100000.0;
             let km_per_sec = dist_km / (self.elapse.as_millis() as f32 / 1000.0);
-            self.km_per_hour = (km_per_sec * 3600.0) / 6.0; // 6 imas
+            self.hall_speed = (km_per_sec * 3600.0) / 6.0; // 6 imas
         }
     }
 }
 
-pub struct BrakePressureSensor {
-    pub adc: Ads1x1x<I2cdev, Ads1115, Resolution16Bit, ads1x1x::mode::OneShot>,
+pub struct ADS1115 {
+    pub adc_ctx: Ads1x1x<I2cdev, Ads1115, Resolution16Bit, ads1x1x::mode::OneShot>,
     pub brake_pressure: f32,
 }
 
-impl BrakePressureSensor {
+impl ADS1115 {
     pub fn new() -> Self {
-        let i2c_dev = I2cdev::new("/dev/i2c-1")
-            .expect("BrakePressureSensor: [ERROR] Failed to open /dev/i2c-1");
-        let mut adc = Ads1x1x::new_ads1115(i2c_dev, TargetAddr::default());
-        adc.set_full_scale_range(ads1x1x::FullScaleRange::Within4_096V)
-            .expect("BrakePressureSensor: [ERROR] Failed to set_full_scale_range");
+        let i2c_dev = I2cdev::new("/dev/i2c-1").expect("ADS1115: [ERROR] Failed to open /dev/i2c-1");
+        let mut adc_ctx = Ads1x1x::new_ads1115(i2c_dev, TargetAddr::default());
+        adc_ctx
+            .set_full_scale_range(ads1x1x::FullScaleRange::Within4_096V)
+            .expect("ADS1115: [ERROR] Failed to set_full_scale_range");
 
-        Self {
-            adc,
-            brake_pressure: 0.0,
-        }
+        Self { adc_ctx, brake_pressure: 0.0 }
     }
 
     pub fn update(&mut self) {
-        let reading = self.adc.read(ads1x1x::channel::SingleA0);
+        let reading = self.adc_ctx.read(ads1x1x::channel::SingleA0);
         match reading {
             Ok(read_val) => {
                 let voltage_val = (read_val as f32) * 4.096 / ((i32::pow(2, 16 - 1) - 1) as f32);
@@ -422,7 +411,7 @@ impl BrakePressureSensor {
             }
             Err(linux_embedded_hal::nb::Error::WouldBlock) => {}
             Err(e) => {
-                println!("BrakePressureSensor: [ERROR] Failed to read ADC. {:#?}", e);
+                println!("ADS1115: [ERROR] Failed to read ADC. {:#?}", e);
                 self.brake_pressure = 0.0 as f32;
             }
         }

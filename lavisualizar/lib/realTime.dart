@@ -149,15 +149,15 @@ class _RealTimeState extends State<RealTime> {
                         "vel",
                         {
                           "title": "Velocidade X",
-                          "value": "${bikeInfo["vel_x"].toStringAsFixed(2)} rad/s"
+                          "value": "${bikeInfo["vel_x"].toStringAsFixed(2)} graus/s"
                         },
                         {
                           "title": "Velocidade Y",
-                          "value": "${bikeInfo["vel_y"].toStringAsFixed(2)} rad/s"
+                          "value": "${bikeInfo["vel_y"].toStringAsFixed(2)} graus/s"
                         },
                         {
                           "title": "Velocidade Z",
-                          "value": "${bikeInfo["vel_z"].toStringAsFixed(2)} rad/s"
+                          "value": "${bikeInfo["vel_z"].toStringAsFixed(2)} graus/s"
                         },
                         chartDataAndController,
                         setState,
@@ -287,7 +287,7 @@ class _RealTimeState extends State<RealTime> {
                         "TEMPERATURA",
                         "termopar1",
                         {
-                          "title": "Tmperatura Pastilha",
+                          "title": "Temperatura da Pastilha",
                           "value": "${bikeInfo["termopar1"].toStringAsFixed(2)} º"
                         },
                         chartDataAndController,
@@ -300,7 +300,7 @@ class _RealTimeState extends State<RealTime> {
                       "PRESSÃO DO FREIO",
                       "brake_pressure",
                       {
-                        "title": "Pressão do freio roda traseira",
+                        "title": "Pressão dos Freios",
                         "value": "${bikeInfo["brake_pressure"].toStringAsFixed(2)} bar"
                       },
                       chartDataAndController,
@@ -516,7 +516,7 @@ Widget buildXYZChart(
               title: ChartTitle(
                 textStyle: TextStyle(
                   color: Colors.white,
-                  fontSize: 5,
+                  fontSize: 15,
                 ),
               ),
               enableAxisAnimation: true,
@@ -535,7 +535,7 @@ Widget buildXYZChart(
                   majorGridLines: MajorGridLines(width: 0),
                   labelStyle: TextStyle(
                       color: Colors.white,
-                      fontSize: 4,
+                      fontSize: 15,
                       fontWeight: FontWeight.w500),
                   title: AxisTitle(
                       text: "Tempo",
@@ -544,7 +544,7 @@ Widget buildXYZChart(
                 majorGridLines: MajorGridLines(width: 0),
                 labelStyle: const TextStyle(
                   color: Colors.white,
-                  fontSize: 4,
+                  fontSize: 15,
                   fontWeight: FontWeight.w500,
                 ),
                 title: AxisTitle(
@@ -560,9 +560,9 @@ Widget buildXYZChart(
             });
           },
           children: <Widget>[
-            Icon(MdiIcons.alphaX),
-            Icon(MdiIcons.alphaY),
-            Icon(MdiIcons.alphaZ),
+            Icon(MdiIcons.alphaX, color: Colors.white),
+            Icon(MdiIcons.alphaY, color: Colors.white),
+            Icon(MdiIcons.alphaZ, color: Colors.white),
           ],
         ),
       ],
@@ -589,7 +589,7 @@ Widget buildOneDimensionalChart(
                   title: ChartTitle(
                     textStyle: TextStyle(
                       color: Colors.white,
-                      fontSize: 5,
+                      fontSize: 15,
                     ),
                   ),
                   enableAxisAnimation: true,
@@ -608,7 +608,7 @@ Widget buildOneDimensionalChart(
                       majorGridLines: MajorGridLines(width: 0),
                       labelStyle: TextStyle(
                           color: Colors.white,
-                          fontSize: 4,
+                          fontSize: 15,
                           fontWeight: FontWeight.w500),
                       title: AxisTitle(
                           text: "Tempo",
@@ -617,7 +617,7 @@ Widget buildOneDimensionalChart(
                     majorGridLines: MajorGridLines(width: 0),
                     labelStyle: const TextStyle(
                       color: Colors.white,
-                      fontSize: 4,
+                      fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
                     title: AxisTitle(
@@ -651,8 +651,8 @@ Widget buildOneDimensionalChart(
             });
           },
           children: <Widget>[
-            Icon(Icons.close),
-            Icon(Icons.play_arrow_rounded),
+            Icon(Icons.close, color: Colors.white),
+            Icon(Icons.play_arrow_rounded, color: Colors.white),
           ],
         ),
       ],
@@ -774,7 +774,7 @@ Widget buildVelGPSAndHallChart(
               title: ChartTitle(
                 textStyle: TextStyle(
                   color: Colors.white,
-                  fontSize: 5,
+                  fontSize: 15,
                 ),
               ),
               enableAxisAnimation: true,
@@ -793,7 +793,7 @@ Widget buildVelGPSAndHallChart(
                   majorGridLines: MajorGridLines(width: 0),
                   labelStyle: TextStyle(
                       color: Colors.white,
-                      fontSize: 4,
+                      fontSize: 15,
                       fontWeight: FontWeight.w500),
                   title: AxisTitle(
                       text: "Tempo",
@@ -802,7 +802,7 @@ Widget buildVelGPSAndHallChart(
                 majorGridLines: MajorGridLines(width: 0),
                 labelStyle: const TextStyle(
                   color: Colors.white,
-                  fontSize: 4,
+                  fontSize: 15,
                   fontWeight: FontWeight.w500,
                 ),
                 title: AxisTitle(
@@ -818,8 +818,8 @@ Widget buildVelGPSAndHallChart(
             });
           },
           children: <Widget>[
-            Icon(MdiIcons.alphaG),
-            Icon(MdiIcons.alphaH),
+            Icon(MdiIcons.alphaG, color: Colors.white),
+            Icon(MdiIcons.alphaH, color: Colors.white),
           ],
         ),
       ],
@@ -868,7 +868,7 @@ Widget buildGPSChart(MapChartController _chartController,
                   title: ChartTitle(
                     textStyle: TextStyle(
                       color: Colors.white,
-                      fontSize: 5,
+                      fontSize: 15,
                     ),
                   ),
                   enableAxisAnimation: true,
@@ -928,8 +928,8 @@ Widget buildGPSChart(MapChartController _chartController,
             });
           },
           children: <Widget>[
-            Icon(Icons.close),
-            Icon(Icons.play_arrow_rounded),
+            Icon(Icons.close, color: Colors.white),
+            Icon(Icons.play_arrow_rounded, color: Colors.white),
           ],
         ),
       ],
