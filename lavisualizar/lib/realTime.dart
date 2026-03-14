@@ -145,7 +145,7 @@ class _RealTimeState extends State<RealTime> {
                     width: 480,
                     height: 380,
                     child: buildXYZCard(
-                        "VELOCIDADE",
+                        "VELOCIDADE ÂNGULAR",
                         "vel",
                         {
                           "title": "Velocidade X",
@@ -166,7 +166,7 @@ class _RealTimeState extends State<RealTime> {
                     width: 480,
                     height: 380,
                     child: buildXYZCard(
-                        "EIXO",
+                        "ÂNGULOS DE ATITUDE",
                         "axis",
                         {"title": "Roll", "value": "${bikeInfo["roll"].toStringAsFixed(2)} º"},
                         {"title": "Pitch", "value": "${bikeInfo["pitch"].toStringAsFixed(2)} º"},
@@ -273,7 +273,7 @@ class _RealTimeState extends State<RealTime> {
                     width: 480,
                     height: 380,
                     child: buildVelGPSAndHallCard(
-                        "Velocidade",
+                        "VELOCIDADE LINEAR",
                         "vel",
                         {"title": "Velocidade GPS", "value": "${bikeInfo["veloc"].toStringAsFixed(2)} km/h"},
                         {"title": "Velocidade Hall", "value": "${bikeInfo["veloc_hall"]} km/h"},

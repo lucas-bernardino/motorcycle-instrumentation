@@ -269,7 +269,7 @@ class _ComparisonState extends State<Comparison> {
                         style: ButtonStyle(backgroundColor: isButtonPressedGroup[5] ? WidgetStateProperty.all(Colors.black38) : WidgetStateProperty.all(Colors.grey[900])),
                         child: SizedBox(
                             width: 125,
-                            child: Text("Yall", style: TextStyle(color: Colors.white), textAlign: TextAlign.center,))),
+                            child: Text("Yaw", style: TextStyle(color: Colors.white), textAlign: TextAlign.center,))),
                     SizedBox(
                       height: 10,
                     ),
@@ -288,7 +288,7 @@ class _ComparisonState extends State<Comparison> {
                         style: ButtonStyle(backgroundColor: isButtonPressedGroup[6] ? WidgetStateProperty.all(Colors.black38) : WidgetStateProperty.all(Colors.grey[900])),
                         child: SizedBox(
                             width: 125,
-                            child: Text("Velocidade", style: TextStyle(color: Colors.white), textAlign: TextAlign.center,))),
+                            child: Text("Velocidade Linear", style: TextStyle(color: Colors.white), textAlign: TextAlign.center,))),
                     SizedBox(
                       height: 10,
                     ),

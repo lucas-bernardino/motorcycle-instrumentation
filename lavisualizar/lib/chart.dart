@@ -455,7 +455,7 @@ class _ChartState extends State<Chart> {
                       style: ButtonStyle(backgroundColor: isButtonPressedGroup[6] ? WidgetStateProperty.all(Colors.black38) : WidgetStateProperty.all(Colors.grey[900])),
                       child: SizedBox(
                           width: 125,
-                          child: Text("Velocidade", style: TextStyle(color: Colors.white), textAlign: TextAlign.center,))),
+                          child: Text("Velocidade Linear", style: TextStyle(color: Colors.white), textAlign: TextAlign.center,))),
                   SizedBox(
                     height: 10,
                   ),
@@ -608,11 +608,13 @@ Widget buildChartIndividual(
       if (item[value_column].toDouble() < minYAxis) {
         minYAxis = item[value_column].toDouble();
       }
-      String rawDateTime = item[time_column].toString();
-      int hour = int.parse(rawDateTime.substring(0, 2));
-      int minutes = int.parse(rawDateTime.substring(3, 5));
-      int seconds = int.parse(rawDateTime.substring(6, 8));
-      int miliseconds = int.parse(rawDateTime.substring(9, 11));
+      List<String> rawDateTime = item[time_column].toString().split(":");
+
+
+      int hour = int.parse(rawDateTime[0]);
+      int minutes = int.parse(rawDateTime[1]);
+      int seconds = int.parse(rawDateTime[2].substring(0, 2));
+      int miliseconds = int.parse(rawDateTime[2].substring(3, 5));
       DateTime dateTime = DateTime(0, 0, 0, hour, minutes, seconds, miliseconds);
       _dataPoints.add(DataPoints(dateTime, item[value_column]));
       totalSum += item[value_column].toDouble();
